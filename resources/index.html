@@ -1,27 +1,673 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>NeutralinoJs sample app</title>
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <div id="neutralinoapp">
-      <h1>NeutralinoJs</h1>
-      <div id="info"></div>
-      <br/>
-      <img src="/icons/logo.gif" alt="Neutralinojs" />
-      <div>
-        <a href="#" onclick="openDocs();">Docs</a> &middot;  
-        <a href="#" onclick="openTutorial();">Video tutorial</a>
-      </div>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+    <link rel="icon" type="image/png" href="favicon.png"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        ENV = {
+            API_URL: 'http://localhost:5001/api'
+        };
+        tailwind.config = {
+            theme: {
+                extend: {
+                    boxShadow: {
+                        'btn': '0 0.25em 0 #1b170e',
+                        'btn-hover': '0 0.15em 0 #1b170e',
+                        'in-deep': 'inset 0 2px 4px 0 rgb(0 0 0 / 0.75)',
+                    },
+                    dropShadow: {
+                        'rec': '0 0 .5rem #1ea42b',
+                        'rec-sm': '0 0 .25rem #1ea42b',
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* Spinner animation for transcription mode */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+    <title>Bespoke Writing Suite</title>
+</head>
+<body class="bg-[#2D334A] text-[#FFFFFE]" x-data>
+
+<div class="h-screen flex flex-col" x-show="onSwitch" x-data="ui" x-cloak>
+    
+    <!-- Header -->
+    <div class="bg-[#0E0726] text-[#FFFFFE] px-4 py-2 flex justify-between items-center">
+        <img src="icons/LONG-Logo_mic-white-SMALL.png" alt="Bespoke" class="h-8 cursor-pointer" @click="activeStory = {}; newOpen=1; window.history.replaceState({}, '', 'index.html')" />
     </div>
-    <!-- Neutralino.js client. This file is gitignored, 
-        because `neu update` typically downloads it.
-        Avoid copy-pasting it. 
-        -->
-    <script src="/js/neutralino.js"></script>
-    <!-- Your app's source files -->
-    <script src="/js/main.js"></script>
-  </body>
+
+    <!-- Story Dashboard - ONLY shows when newOpen==1 -->
+    <template x-if="newOpen==1">
+        <div class="flex-1 overflow-y-auto">
+            <div class="m-3" x-init="loadStories()">
+                <!-- Create New Story Module -->
+                <div class="text-3xl mb-3">Start a New Story</div>
+                <div class="p-5 rounded-xl border border-slate-500 hover:border-[#8694A0]">
+                    <div class="flex justify-between mb-2">
+                        <input type="text" x-model="newStoryName" class="p-2 rounded drop-shadow bg-slate-600 w-full" placeholder="Story name" />
+                    </div>
+                    <div class="flex flex-wrap justify-between gap-2">
+                        <div class="flex items-center">
+                            <select x-model="newStoryPreset" class="p-2 rounded drop-shadow bg-slate-600 italic border border-transparent hover:border-[#FFD905]">
+                                <option value="">Story Structure</option>
+                                <option>Free Form</option>
+                                <option>Four Act</option>
+                                <option>Five Act TV</option>
+                                <option>Eight Sequences</option>
+                                <option>Save the Cat</option>
+                                <option>Story Circle</option>
+                            </select>
+                        </div>
+                        <div><input x-model.number="newStoryMinutes" type="number" class="p-2 rounded drop-shadow w-16 bg-slate-600" value="90" /> minutes</div>
+                        <button :class="$store.utils.iconBtn" @click="newOpenStory(newStoryName, null, newStoryPreset, newStoryMinutes)">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span class="ml-1 text-sm font-bold">Create Story</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="h-16"></div>
+                
+                <!-- Story List -->
+                <div class="text-3xl mb-3">Your Stories</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <template x-for="story in storyList" :key="story.id">
+                        <div class="relative">
+                            <!-- Hamburger Menu -->
+                            <div class="absolute top-2 right-2 z-10" x-data="{open:false}" @click.outside="open=false">
+                                <button @click.stop="open=!open" class="p-1 rounded hover:bg-slate-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#FFD905]" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                    </svg>
+                                </button>
+                                <div x-show="open" class="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5" role="menu">
+                                    <div class="py-1">
+                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => copyStory(story))">Copy Story</span>
+                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => renameStory(story))">Rename Story</span>
+                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadOutline(story))">Export Outline</span>
+                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadTranscript(story))">Export Transcript</span>
+                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => deleteStory(story))">Delete Story</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Story Card -->
+                            <a :href="'index.html?sid='+story.id">
+                                <div class="relative p-5 rounded-xl border border-transparent bg-slate-500 hover:bg-transparent hover:border-[#FFCC33]">
+                                    <div class="text-lg font-bold" x-text="story.name"></div>
+                                    <div class="h-10"></div>
+                                    <div class="flex justify-between text-sm">
+                                        <div class="italic" x-text="story.sectionPreset"></div>
+                                        <div x-text="'Transcribed '+ time2ms(storyDuration(story)) +' of '+ story.minutes +' minutes'"></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    </template>
+                </div>
+                <div class="h-16"></div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Story Outliner View - ONLY shows when activeStory exists AND newOpen != 1 -->
+    <template x-if="activeStory?.id && activeStory?.scenes && newOpen != 1">
+        <div class="flex-1 overflow-y-auto">
+            <div class="pb-3">
+                <div class="w-full pt-3 px-3 mb-2 flex flex-wrap items-center justify-between">
+                    <!-- Story Nav -->
+                    <div class="relative z-10" x-data="{ open:false }" @click.stop="!open && loadStories(); open=!open" @keydown.escape.stop="open = false;" @click.outside="open=false">
+                        <div class="flex items-center cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFD905] hover:text-[#C29100]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                            <span x-text="activeStory.name" class="text-3xl hover:text-gray-500"></span>
+                        </div>
+                        <div x-show="open" class="origin-top-left absolute left-0 mt-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5" role="menu">
+                            <div class="py-1">
+                                <span :class="$store.utils.menuItem" @click.stop="open=false; activeStory = {}; newOpen=1; window.history.replaceState({}, '', 'index.html')">New Story</span>
+                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => copyStory(activeStory))">Copy Story</span>
+                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => renameStory(activeStory))">Rename Story</span>
+                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadOutline(activeStory))">Export Outline</span>
+                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadTranscript(activeStory))">Export Transcript</span>
+                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => deleteStory(activeStory))">Delete Story</span>
+                            </div>
+                            <div class="py-1 border-t" x-show="storyList.length">
+                                <span class="px-4 py-2 text-sm text-gray-400">Your Stories</span>
+                                <template x-for="story in storyList" :key="story.id">
+                                    <a x-text="story.name" :class="$store.utils.menuItem" :href="'index.html?sid='+story.id"></a>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- System Nav -->
+                    <div class="whitespace-nowrap text-sm">
+                        <span>Structure</span>
+                        <select class="p-1 mr-3 rounded text-gray-900 drop-shadow" :value="activeStory.sectionPreset" @change="migratePreset(activeStory, $el.value)">
+                            <option>Free Form</option>
+                            <option>Four Act</option>
+                            <option>Five Act TV</option>
+                            <option>Eight Sequences</option>
+                            <option>Save the Cat</option>
+                            <option>Story Circle</option>
+                        </select>
+                        <span x-text="time2ms(storyDuration(activeStory))+ ' of'"></span>
+                        <input type="number" class="p-1 rounded text-gray-900 drop-shadow w-12" @change="setMinutes(activeStory, parseInt($el.value,10))" :value="activeStory?.minutes" />
+                    </div>
+                </div>
+                
+                <!-- Story Sections -->
+                <div class="w-full pt-3 px-3 pb-2 flex flex-col">
+                    <template x-for="(section, idx) of activeStory.sections" :key="section?.id">
+                        <div x-data="{showSection:true}" 
+                             class="group relative w-full pr-4 pt-6 pb-6 mb-10 rounded-xl border hover:border-[#8694A0] border-slate-500"
+                             @drop.prevent="(activeStory.scenes.findIndex(e => e.sectionIdx == idx) == -1) && reorderScenes(activeStory, $event.dataTransfer.getData('idx'), idx, true);"
+                             @dragover.prevent="$event.dataTransfer.dropEffect = 'move';">
+                            
+                            <!-- Section Header -->
+                            <div class="absolute inset-x-0 top-0 flex justify-center cursor-pointer" @click="showSection=!showSection">
+                                <div class="px-2 rounded-b text-white text-sm bg-slate-500 group-hover:bg-[#8694A0] whitespace-nowrap hover:text-slate-300 cursor-pointer" 
+                                     @click.stop="$store.utils.showAlert($store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.name + '\n\n' + $store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.desc, null, true, 'special')">
+                                    <span x-text="$store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.name"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-stretch pl-4">
+                                <div class="grow">
+                                    <div class="flex gap-1">
+                                        <div class="pt-1" x-show="activeStory.scenes.find(e => e.sectionIdx == idx)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" :class="{...$store.utils.iconClk, 'w-6':1, 'h-6':1}" x-show="showSection" @click="showSection=!showSection" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <title>Hide Scenes</title>
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                                            </svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" :class="{...$store.utils.iconClk, 'w-6':1, 'h-6':1}" x-show="!showSection" @click="showSection=!showSection" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <title>Show Scenes</title>
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                        <textarea :rows="(section.value.toString().match(/\n/g)||'').length + 1" 
+                                                  x-model="section.value" 
+                                                  class="w-full p-1 text-sm bg-transparent rounded border border-slate-500/0 hover:border-slate-500/50 focus:bg-slate-600 placeholder:text-slate-500 transition-colors duration-500" 
+                                                  :placeholder="$store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.desc" 
+                                                  @change="Alpine.store('api').saveStory(activeStory)"></textarea>
+                                    </div>
+                                    
+                                    <!-- Scene Cards with Drag & Drop -->
+                                    <div class="mt-2" x-show="showSection">
+                                        <template x-for="(scene, sceneIdx) of activeStory.scenes.filter(s => s.sectionIdx === idx)" :key="scene.id">
+                                            <div x-data="{dover:null}" 
+                                                 class="w-full p-3 bg-slate-600 mb-3 text-sm border rounded-xl" 
+                                                 :class="{'border-[#2CD83D]':dover==sceneIdx, 'border-transparent':dover!=sceneIdx}"
+                                                 draggable="true"
+                                                 @dragstart="$event.dataTransfer.setData('idx', activeStory.scenes.findIndex(s => s.id === scene.id))"
+                                                 @drop.prevent="$event.stopImmediatePropagation(); reorderScenes(activeStory, $event.dataTransfer.getData('idx'), activeStory.scenes.findIndex(s => s.id === scene.id)); dover=null;"
+                                                 @dragleave="dover=null;"
+                                                 @dragover.prevent="$event.dataTransfer.dropEffect = 'move'; dover=sceneIdx;">
+                                                
+                                                <!-- Talk Your Draft Button Row -->
+                                                <div class="w-full flex items-center justify-between gap-2 mb-2">
+                                                    <button :class="$store.utils.iconBtn" @click="setScene(activeStory, scene)" class="border border-[#FFD905]">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="fill-[#FFD905] w-4 h-4" viewBox="0 0 14 19" fill="none">
+                                                            <title>Talk Your Draft</title>
+                                                            <path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/>
+                                                        </svg>
+                                                        <span class="ml-1 text-xs font-bold">Talk Your Draft</span>
+                                                    </button>
+                                                    <div x-text="time2ms(scene?.duration)" title="Transcribed Minutes"></div>
+                                                </div>
+                                                
+                                                <!-- Location and Description Row -->
+                                                <div class="w-full flex gap-2">
+                                                    <div class="w-full flex flex-col items-center justify-between gap-2">
+                                                        <input type="text" 
+                                                               class="w-full p-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent focus:bg-slate-600 text-sm transition-colors duration-500" 
+                                                               @focus="$el.select()" 
+                                                               @change="editScene(activeStory,scene,'name',$el.value.trim())" 
+                                                               :value="scene.name" />
+                                                        <textarea rows="2" 
+                                                                  class="italic w-full p-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent focus:bg-slate-600 text-sm transition-colors duration-500" 
+                                                                  placeholder="Scene description. Max 100 words." 
+                                                                  @change="editScene(activeStory,scene,'desc',$el.value.trim())" 
+                                                                  :value="scene.desc"></textarea>
+                                                    </div>
+                                                    
+                                                    <!-- Drag Handle and Delete -->
+                                                    <div class="flex flex-col items-center justify-between gap-2">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="cursor-move h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <title>Drag to Reorder Scenes</title>
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                                                        </svg>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" @click="deleteScene(activeStory, scene)">
+                                                            <title>Delete Scene</title>
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                
+                                            </div>
+                                        </template>
+                                    </div>
+                                    
+                                    <!-- Add Scene Button -->
+                                    <div class="flex items-center justify-between mt-3">
+                                        <button :class="$store.utils.iconBtn" @click="addScene(activeStory, idx, null, []) && (showSection=true)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            <span class="ml-1 text-xs font-bold">Add Scene</span>
+                                        </button>
+                                        <div class="px-2 py-1 rounded-lg bg-slate-500 text-sm whitespace-nowrap" title="Page Range" x-text="sectionBeats(activeStory.sectionPreset, idx, activeStory.minutes)"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Manual Diarization Modal - ONLY shows when activeScene exists -->
+    <template x-if="activeScene?.id">
+        <div class="fixed z-10 inset-0 overflow-y-auto" role="dialog" aria-modal="true" x-data="{showIns:false}">
+            <div class="flex items-baseline justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block">
+                <!-- Background overlay - clicking closes modal unless recording/transcribing -->
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="setScene(activeStory)"></div>
+                
+                <!-- Modal Content -->
+                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all max-w-3xl w-full sm:my-8 sm:align-middle">
+
+                    <!-- Scene Header -->
+                    <div class="px-4 py-2">
+                        <div class="flex items-center gap-1">
+                            <!-- Editable Scene Name -->
+                            <input type="text" 
+                                   class="w-full text-lg px-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
+                                   @focus="$el.select()" 
+                                   @change="editScene(activeStory, activeScene, 'name', $el.value.trim())" 
+                                   :value="activeScene.name" />
+                            
+                            <!-- Previous Scene Button -->
+                            <button :class="$store.utils.iconBtn" @click="setScene(activeStory, activeScene, -1)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905" stroke-width="2">
+                                    <title>Previous Scene</title>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            
+                            <!-- Next Scene Button -->
+                            <button :class="$store.utils.iconBtn" @click="setScene(activeStory, activeScene, 1)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905" stroke-width="2">
+                                    <title>Next Scene</title>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                            
+                            <!-- More Options Menu -->
+                            <div class="relative z-10" x-data="{ open:false }" @keydown.escape.stop="open=false;" @click.outside="open=false">
+                                <button :class="$store.utils.iconBtn" @click="open=!open">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#FFD905]" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                    </svg>
+                                </button>
+                                <div x-show="open" @click="open=false;" :class="$store.utils.menuPopup" class="top-8 right-0" role="menu" aria-orientation="vertical" tabindex="-1">
+                                    <div class="py-1" role="none">
+                                        <span role="menuitem" tabindex="-1" :class="$store.utils.menuItem" @click="addScene(activeStory, activeScene.sectionIdx, activeScene.id, []) && setScene(activeStory, activeScene, 1)">Add Scene</span>
+                                        <span role="menuitem" tabindex="-1" :class="$store.utils.menuItem" @click="let idx = deleteScene(activeStory, activeScene); setScene(activeStory, null, null, idx-1)">Delete Scene</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Scene Description -->
+                        <textarea rows="2" 
+                                  class="italic w-full p-1 mt-2 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
+                                  placeholder="Scene description. Max 100 words." 
+                                  @change="editScene(activeStory, activeScene, 'desc', $el.value.trim())" 
+                                  :value="activeScene.desc"></textarea>
+                    </div>
+
+                    <!-- Main Recording Interface -->
+                    <div class="flex flex-col items-center mx-2 mb-2">
+
+                        <!-- Instructions Toggle & Character Reuse -->
+                        <div class="w-full flex justify-between items-center px-2">
+                            <button :class="$store.utils.iconBtn" @click="showIns=!showIns">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FFCC33]" x-show="showIns" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                                </svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FFCC33]" x-show="!showIns" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                                <span class="ml-1 text-xs">Instructions</span>
+                            </button>
+                            
+                            <!-- Reuse Characters Dropdown -->
+                            <select class="p-1 text-sm bg-slate-500 rounded" 
+                                    @change="(activeStory.scenes[$el.value]?.chars && setSceneChars(activeStory, activeScene, activeStory.scenes[$el.value].chars) && $store.utils.showAlert('Characters copied from '+activeStory.scenes[$el.value].name, null, null, 'notice')); $el.value=-1">
+                                <option value="-1">Reuse characters from...</option>
+                                <template x-for="(scene, idx) in activeStory?.scenes||[]" :key="scene.id">
+                                    <option :value="idx" x-text="scene.name" :disabled="scene.id == activeScene.id"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Instructions Panel (collapsible) -->
+                        <div class="flex flex-col gap-2 pt-1 px-3" x-show="showIns" x-transition>
+                            <div><span class="font-bold text-[#FFCC33]">1. </span><span class="text-sm">Click the numbered buttons to assign character names.</span></div>
+                            <div><span class="font-bold text-[#FFCC33]">2. </span><span class="text-sm">Click the microphone to start transcribing. (It will then turn into a pause button)</span></div>
+                            <div><span class="font-bold text-[#FFCC33]">3. </span><span class="text-sm">Click a character name then talk their lines. (Repeat for all dialogue and Action lines)</span></div>
+                            <div><span class="font-bold text-[#FFCC33]">4. </span><span class="text-sm">Click pause to stop transcribing.</span></div>
+                        </div>
+
+                        <!-- Character Grid & Microphone -->
+                        <div class="w-full flex flex-col items-center">
+                            <div class="w-full grid grid-cols-3 justify-items-center place-items-center gap-3 p-2 rounded-lg border-0 border-slate-500">
+                                
+                                <!-- Character Buttons 7-9, 4-6, 1-3 -->
+                                <template x-for="i in [7,8,9, 4,5,6, 1,2,3]" :key="i">
+                                    <div class="w-full flex flex-col items-center justify-center">
+                                        <button @click="if (mode == 'setup') { charEdit = i; $nextTick(() => $refs.charName && $refs.charName.select()) } else { startStopRecording(i, false) }" 
+                                                :class="{ 
+                                                    'relative':1, 'p-4':1, 'w-full':1, 'h-24':1, 
+                                                    'flex':1, 'items-center':1, 'justify-center':1, 
+                                                    'rounded-lg':1, 'bg-slate-500':1, 'text-white':1, 
+                                                    'outline-none':1, 'border':1, 
+                                                    'hover:bg-transparent':1, 'hover:border-[#FFD905]':1, 
+                                                    'active:border-[#FFD905]':1, 'active:bg-transparent':1, 
+                                                    'duration-200':1,
+                                                    'bg-transparent': currnum === i && mode == 'active',
+                                                    'border-[#2cd83d]': currnum === i && mode == 'active',
+                                                    'border-transparent': !(currnum === i && mode == 'active')
+                                                }" 
+                                                :title="'While transcribing you can click this button or press '+i+' on your keyboard'">
+                                            <span class="overflow-hidden font-bold" x-text="activeScene?.chars?.[i]"></span>
+                                            <span x-text="i" class="absolute bottom-1 right-1 px-1 text-xs text-[#FFD905] border-[#FFD905] border rounded-lg"></span>
+                                        </button>
+                                    </div>
+                                </template>
+                                
+                                <!-- ACTION Button (0) -->
+                                <button @click="if (mode == 'setup') { $store.utils.showAlert('Click the microphone to start transcribing') } else { startStopRecording(0, false) }" 
+                                        :class="{ 
+                                            'col-span-2':1, 'h-16':1, 'font-bold':1, 
+                                            'relative':1, 'p-4':1, 'w-full':1, 
+                                            'flex':1, 'items-center':1, 'justify-center':1, 
+                                            'rounded-lg':1, 'bg-slate-500':1, 'text-white':1, 
+                                            'outline-none':1, 'border':1, 
+                                            'hover:bg-transparent':1, 'hover:border-[#FFD905]':1, 
+                                            'duration-200':1,
+                                            'bg-transparent': currnum === 0 && mode == 'active',
+                                            'border-[#2cd83d]': currnum === 0 && mode == 'active',
+                                            'border-transparent': !(currnum === 0 && mode == 'active')
+                                        }" 
+                                        title="While transcribing you can click this button or press 0 on your keyboard">
+                                    ACTION
+                                    <span class="absolute bottom-1 right-1 px-1 text-xs text-[#FFD905] border-[#FFD905] border rounded-lg">0</span>
+                                </button>
+                                
+                                <!-- Microphone/Pause Button -->
+                                <div @click="activateRecording(activeScene, $refs.visualizer)" class="flex items-center justify-center h-16">
+                                    <!-- Microphone Icon (Setup Mode) -->
+                                    <template x-if="mode!='active'">
+                                        <svg class="h-12 w-12 fill-[#FFCC33] p-2 bg-slate-500 rounded-full border border-transparent hover:bg-transparent hover:border-[#FFCC33] hover:cursor-pointer" 
+                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 19" fill="none">
+                                            <title>Start Transcribing</title>
+                                            <path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/>
+                                        </svg>
+                                    </template>
+                                    
+                                    <!-- Pause Icon (Active Mode) -->
+                                    <template x-if="mode=='active'">
+                                        <svg class="h-12 w-12 fill-[#2cd83d] p-2 bg-slate-500 rounded-full border border-transparent hover:bg-transparent hover:border-[#FFCC33] hover:cursor-pointer" 
+                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                            <title>Pause Transcribing</title>
+                                            <path d="M224 432h-80V80h80zM368 432h-80V80h80z"/>
+                                        </svg>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- visCanvas Area - 4 States -->
+                        <div class="w-full flex justify-between items-center mt-3">
+                            
+                            <!-- STATE 1: ACTIVE MODE - Recording in progress -->
+                            <div x-show="mode=='active'" class="grow flex items-center rounded-full bg-white">
+                                <div class="basis-2/12 text-red-700 text-center text-sm bg-white mx-2" x-text="timerDisplay"></div>
+                                <div class="basis-8/12 relative h-7 bg-gray-200 drop-shadow">
+                                    <!-- Yellow progress bar -->
+                                    <div class="bg-[#FFCC33] h-full" :style="{width:(timer>sceneMax ? '100' : timer/sceneMax*100)+'%'}"></div>
+                                    <!-- Green waveform visualizer overlay -->
+                                    <canvas id="viscanvas" x-ref="visualizer" class="absolute top-0 left-0 h-full w-full"></canvas>
+                                </div>
+                                <div class="basis-2/12 text-red-700 text-center text-sm bg-white mx-2" x-text="time2ms(sceneMax)"></div>
+                            </div>
+                            
+                            <!-- STATE 2: SETUP MODE - Empty scene -->
+                            <template x-if="mode=='setup' && !audioURL">
+                                <div class="grow text-center text-sm font-bold" 
+                                     :class="{'animate-pulse':loading}" 
+                                     x-text="loading ? 'LOADING AUDIO - PLEASE WAIT' : 'Transcribe up to a '+( Math.round((sceneMax/60 + Number.EPSILON) * 10) / 10 )+' minute scene'">
+                                </div>
+                            </template>
+                            
+                            <!-- STATE 3: SETUP MODE - Scene with compiled audio -->
+                            <template x-if="mode=='setup' && audioURL">
+                                <audio controls class="grow h-7" :src="audioURL"></audio>
+                            </template>
+                            
+                            <!-- STATE 4: TRANSCRIPTION MODE - Batch processing (NEW!) -->
+                            <template x-if="mode=='transcription'">
+                                <div class="grow flex flex-col items-center justify-center py-2">
+                                    <!-- Spinner -->
+                                    <div class="spinner border-4 border-[#FFCC33] border-t-transparent rounded-full w-6 h-6 mb-1"></div>
+                                    
+                                    <!-- Status Message -->
+                                    <div class="text-center text-xs font-bold">
+                                        <div>Transcription in Progress</div>
+                                        <div class="text-slate-400 mt-1" x-text="`Processing ${Math.round((transcriptionProgress.current / transcriptionProgress.total) * 100)}%`"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Export & Show Transcript Buttons -->
+                        <div class="w-full flex justify-between items-center mt-3 gap-2">
+                            <button type="button" :class="$store.utils.iconBtn" @click="downloadTranscript(activeStory)">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[#FFD905]">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                                <span class="ml-1 text-sm font-bold">Export Transcript</span>
+                            </button>
+                            
+                            <button type="button" :class="$store.utils.baseBtn" @click="tView=!tView">
+                                <span x-text="(tView?'Hide':'Show') + ' Transcript'"></span>
+                            </button>
+                            
+                            <div class="grow">&nbsp;</div>
+                            
+                            <button type="button" :class="$store.utils.baseBtn" @click="setScene(activeStory)">Close</button>
+                        </div>
+
+                        <!-- Transcript Display (Accordion - Closed by Default) -->
+                        <div class="w-full p-3 mt-3 max-h-48 overflow-auto border border-gray-300 rounded-lg" x-show="tView">
+                            <div class="font-bold mb-2" x-text="activeScene?.name"></div>
+                            
+                            <!-- No transcripts yet -->
+                            <template x-if="!(activeScene?.trackOrder?.length) && !sessionBlobs.length">
+                                <p class="text-sm text-slate-500">Start recording and your transcript will appear here.</p>
+                            </template>
+                            
+                            <!-- Display saved transcripts from scene.tracks -->
+                            <template x-for="tid of (activeScene?.trackOrder||[])" :key="tid">
+                                <div class="mb-2">
+                                    <template x-if="activeScene?.tracks?.[tid]?.name == 'ACTION'">
+                                        <div x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+                                    </template>
+                                    <template x-if="activeScene?.tracks?.[tid]?.name != 'ACTION'">
+                                        <div class="flex flex-col items-center">
+                                            <div class="font-bold" x-text="activeScene?.tracks?.[tid]?.name"></div>
+                                            <div class="w-3/4" x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            
+                            <!-- Show pending message if session blobs exist -->
+                            <template x-if="sessionBlobs.length > 0">
+                                <div class="italic text-slate-400 mt-4">Pending transcription</div>
+                            </template>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Character Edit Modal -->
+    <template x-if="charEdit">
+        <div class="fixed z-20 inset-0 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="flex items-baseline justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div class="bg-[#2D334A] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="flex-grow mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                <h3 class="text-lg leading-6 font-medium">Enter or select a character name</h3>
+                                <div class="mt-2 text-gray-500">
+                                    <input type="text" 
+                                           x-ref="charName" 
+                                           class="p-2 rounded w-full border drop-shadow text-gray-900" 
+                                           @keyup.enter="setCharName(activeStory, activeScene, charEdit, $refs.charName.value) && (charEdit=0)"
+                                           x-init="$nextTick(() => $refs.charName && $refs.charName.focus())"/>
+                                    <select x-ref="charSel" 
+                                            class="mt-1 p-2 rounded w-full border drop-shadow text-gray-900" 
+                                            @change="$refs.charName.value = $refs.charSel.value">
+                                        <option value="">Characters...</option>
+                                        <template x-for="c in allChars(activeStory)" :key="c">
+                                            <option :value="c" x-text="c"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 flex justify-end gap-2">
+                        <button type="button" :class="$store.utils.baseBtn" @click="charEdit=0">Cancel</button>
+                        <button type="button" :class="$store.utils.baseBtn" @click="setCharName(activeStory, activeScene, charEdit, $refs.charName.value) && (charEdit=0)">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Custom Confirmation/Prompt Modal (replaces native confirm/prompt) -->
+    <template x-if="modal.show">
+        <div class="fixed z-50 inset-0 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+                <!-- Background overlay -->
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                
+                <!-- Modal Content -->
+                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div class="bg-[#2D334A] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="flex-grow mt-3 text-center sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-lg leading-6 font-medium text-[#FFFFFE] mb-3" x-text="modal.title"></h3>
+                                <div class="mt-2">
+                                    <p class="text-sm text-gray-300 mb-3" x-text="modal.message"></p>
+                                    
+                                    <!-- Input field for prompt type -->
+                                    <template x-if="modal.type === 'prompt'">
+                                        <input type="text" 
+                                               x-model="modal.inputValue" 
+                                               class="w-full p-2 rounded border border-gray-400 bg-slate-600 text-white" 
+                                               @keyup.enter="confirmModal()"
+                                               x-init="$nextTick(() => $el.focus())" />
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-[#2D334A] px-4 py-3 flex justify-end gap-2">
+                        <button type="button" 
+                                :class="$store.utils.baseBtn" 
+                                @click="cancelModal()">
+                            Cancel
+                        </button>
+                        <button type="button" 
+                                class="px-4 py-2 rounded-md border border-transparent bg-[#FFD905] text-[#1b170e] text-sm font-medium hover:bg-[#E5C400] shadow outline-none"
+                                @click="confirmModal()">
+                            <span x-text="modal.type === 'confirm' ? 'Delete' : 'OK'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+</div>
+
+<!-- Alert Modal -->
+<template x-if="$store.utils.alertInfo.show">
+    <div class="fixed z-50 inset-x-0 top-2 h-fit w-fit mx-auto border-2 border-[#842029] rounded bg-[#F9D7DA] text-[#842029] text-sm">
+        <div class="flex items-center p-2 max-w-xl">
+            <span x-text="$store.utils.alertInfo.msg"></span>
+            <template x-if="$store.utils.alertInfo.modal">
+                <button type="button" class="mx-2 rounded-md border border-red-300 p-1 bg-white hover:bg-gray-100" @click="$store.utils.showAlert()">OK</button>
+            </template>
+        </div>
+    </div>
+</template>
+
+<script src="js/neutralino.js"></script>
+<script>
+    // Initialize Neutralino
+    Neutralino.init();
+    
+    // Dev Tools Shortcuts
+    document.addEventListener('keydown', async (e) => {
+        // Cmd+R or Ctrl+R to reload
+        if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+            e.preventDefault();
+            location.reload();
+        }
+    });
+</script>
+<script type="module">
+    console.log('🚀 Starting app initialization...');
+    
+    // Import Alpine as a module
+    const Alpine = (await import('https://unpkg.com/alpinejs@3.10.1/dist/module.esm.js')).default;
+    window.Alpine = Alpine;
+    console.log('📦 Alpine loaded as module');
+    
+    // Import main.js to register components
+    await import('./js/main.js');
+    console.log('✅ main.js imported');
+    
+    // Now start Alpine
+    Alpine.start();
+    console.log('🎯 Alpine.start() called');
+</script>
+</body>
 </html>

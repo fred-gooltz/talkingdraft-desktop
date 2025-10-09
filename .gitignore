@@ -1,13 +1,65 @@
+# Audio files and STT engine
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+audio/
+recordings/
+models/
+whisper/
+stt-engine/
+*.bin
+*.onnx
+*.pth
+
+# Node modules and dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+.neu/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment and secrets
+.env
+.env.local
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
 # Developer tools' files
 .lite_workspace.lua
 
 # Neutralinojs binaries and builds
 /bin
-/dist
 
 # Neutralinojs client (minified)
 neutralino.js
 
 # Neutralinojs related files
 .storage
-*.log
