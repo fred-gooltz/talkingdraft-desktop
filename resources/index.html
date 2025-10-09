@@ -94,13 +94,12 @@
                                         <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                     </svg>
                                 </button>
-                                <div x-show="open" class="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5" role="menu">
+                                <div x-show="open" class="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20" role="menu">
                                     <div class="py-1">
-                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => copyStory(story))">Copy Story</span>
-                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => renameStory(story))">Rename Story</span>
-                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadOutline(story))">Export Outline</span>
-                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadTranscript(story))">Export Transcript</span>
-                                        <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => deleteStory(story))">Delete Story</span>
+                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; copyStory(story)">Copy Story</span>
+                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; renameStory(story)">Rename Story</span>
+                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; dnlStory=story">Export Story</span>
+                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; deleteStory(story)">Delete Story</span>
                                     </div>
                                 </div>
                             </div>
@@ -137,14 +136,13 @@
                             </svg>
                             <span x-text="activeStory.name" class="text-3xl hover:text-gray-500"></span>
                         </div>
-                        <div x-show="open" class="origin-top-left absolute left-0 mt-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5" role="menu">
+                        <div x-show="open" class="origin-top-left absolute left-0 mt-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20" role="menu">
                             <div class="py-1">
-                                <span :class="$store.utils.menuItem" @click.stop="open=false; activeStory = {}; newOpen=1; window.history.replaceState({}, '', 'index.html')">New Story</span>
-                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => copyStory(activeStory))">Copy Story</span>
-                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => renameStory(activeStory))">Rename Story</span>
-                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadOutline(activeStory))">Export Outline</span>
-                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => downloadTranscript(activeStory))">Export Transcript</span>
-                                <span :class="$store.utils.menuItem" @click.stop="open=false; $nextTick(() => deleteStory(activeStory))">Delete Story</span>
+                                <span :class="$store.utils.menuItem" @click.prevent="open=false; activeStory = {}; newOpen=1; window.history.replaceState({}, '', 'index.html')">New Story</span>
+                                <span :class="$store.utils.menuItem" @click.prevent="open=false; copyStory(activeStory)">Copy Story</span>
+                                <span :class="$store.utils.menuItem" @click.prevent="open=false; renameStory(activeStory)">Rename Story</span>
+                                <span :class="$store.utils.menuItem" @click.prevent="open=false; dnlStory=activeStory">Export Story</span>
+                                <span :class="$store.utils.menuItem" @click.prevent="open=false; deleteStory(activeStory)">Delete Story</span>
                             </div>
                             <div class="py-1 border-t" x-show="storyList.length">
                                 <span class="px-4 py-2 text-sm text-gray-400">Your Stories</span>
@@ -538,6 +536,39 @@
 
                     </div>
 
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Export Story Modal -->
+    <template x-if="dnlStory">
+        <div class="fixed z-30 inset-0 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="flex items-baseline justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div class="bg-[#2D334A] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 sm:mx-0 sm:h-10 sm:w-10">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5 text-[#FFD905]">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                            </div>
+                            <div class="flex-grow mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                <h3 class="text-lg leading-6 font-medium">Export Story</h3>
+                                <div class="mt-2">
+                                    <select x-ref="dnlSel" class="p-2 rounded w-full border drop-shadow bg-slate-600 text-white">
+                                        <option value="transcript">Full Transcript</option>
+                                        <option value="outline">Full Outline</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 flex justify-end gap-2">
+                        <button type="button" :class="$store.utils.baseBtn" @click="dnlStory=null">Cancel</button>
+                        <button type="button" class="px-4 py-2 rounded-md border border-transparent bg-[#FFD905] text-[#1b170e] text-sm font-medium hover:bg-[#E5C400] shadow outline-none" @click="console.log('Export clicked', $refs.dnlSel.value, dnlStory); ($refs.dnlSel.value=='outline') ? downloadOutline(dnlStory) : downloadTranscript(dnlStory); dnlStory=null">Export</button>
+                    </div>
                 </div>
             </div>
         </div>

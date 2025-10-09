@@ -1107,17 +1107,22 @@ document.addEventListener('alpine:init', () => {
             this.timerDisplay = this.time2ms(this.timer);
         },
 
-        downloadOutline (story) {
-            let outline = "";
-            let preset = Alpine.store('api').sectionPresets[story.sectionPreset];
-
+        async downloadOutline(story) {
+            console.log('📄 downloadOutline called with story:', story?.name, story?.id);
+            
             if (!story?.id || !story?.sections) { 
+                console.log('❌ Invalid story:', story);
                 return Alpine.store('utils').showAlert('Error: Invalid story.'); 
             }
+            
+            let preset = Alpine.store('api').sectionPresets[story.sectionPreset];
             if (!preset?.sections) { 
+                console.log('❌ Invalid preset:', story.sectionPreset);
                 return Alpine.store('utils').showAlert('Error: Invalid story preset.'); 
             }
 
+            // Generate outline content
+            let outline = "";
             for (let i=0; i<story.sections.length; i++) {
                 let sec = story.sections[i];
                 outline += (preset.sections[i]?.act + "\n" + preset.sections[i]?.name + " - " + sec.value + "\n\n");
@@ -1127,17 +1132,50 @@ document.addEventListener('alpine:init', () => {
                 }
                 outline += "\n\n";
             }
+            
             if (outline.length == 0) { 
+                console.log('❌ No outline content');
                 return Alpine.store('utils').showAlert('No outline available.'); 
             }
             
-            let element = document.createElement('a');
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(outline));
-            element.setAttribute('download', story.name+'_Outline.txt');
-            element.style.display = 'none';
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
+            console.log('✅ Outline generated, length:', outline.length);
+            
+            // Create safe filename
+            const filename = story.name.replace(/[^a-z0-9]/gi, '_') + '_Outline.txt';
+            
+            // ✅ FIX: Use showSaveDialog WITHOUT defaultPath (macOS bug workaround)
+            try {
+                if (typeof Neutralino !== 'undefined' && Neutralino.os && Neutralino.filesystem) {
+                    console.log('📂 Calling Neutralino save dialog (without defaultPath - macOS workaround)');
+                    
+                    // Don't use defaultPath on macOS - it causes the dialog to fail!
+                    const savePath = await Neutralino.os.showSaveDialog('Save Outline');
+                    
+                    console.log('📂 Save dialog returned:', savePath);
+                    
+                    if (savePath && savePath !== '') {
+                        // User selected a path, but we need to ensure it has .txt extension
+                        let finalPath = savePath;
+                        if (!finalPath.toLowerCase().endsWith('.txt')) {
+                            finalPath += '.txt';
+                        }
+                        
+                        console.log('💾 Writing file to:', finalPath);
+                        await Neutralino.filesystem.writeFile(finalPath, outline);
+                        console.log('✅ File saved successfully!');
+                        Alpine.store('utils').showAlert('Outline exported successfully!', 2000, false, 'notice');
+                        return;
+                    } else {
+                        console.log('ℹ️ User cancelled save');
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('❌ Save error:', err);
+                if (err.code && err.code !== 'NE_OS_DIACANC') {
+                    Alpine.store('utils').showAlert('Error saving file: ' + (err.message || 'Unknown error'));
+                }
+            }
         },
 
         // Custom modal helpers (replace native confirm/prompt)
@@ -1185,10 +1223,15 @@ document.addEventListener('alpine:init', () => {
             this.modal.show = false;
         },
 
-        downloadTranscript (story) {
+        async downloadTranscript(story) {
+            console.log('📝 downloadTranscript called with story:', story?.name, story?.id);
+            
             if (!story?.id || !story?.scenes) { 
+                console.log('❌ Invalid story:', story);
                 return Alpine.store('utils').showAlert('Error: Invalid story.'); 
             }
+            
+            // Generate transcript content
             let transcript = "";
             for (const scene of story.scenes) {
                 transcript += (scene.name) + "\n\n";
@@ -1204,19 +1247,54 @@ document.addEventListener('alpine:init', () => {
                     }
                 }
                 transcript += "\n";
-            }			
+            }
+            
             if (transcript.length == 0) { 
+                console.log('❌ No transcript content');
                 return Alpine.store('utils').showAlert('No transcript available.'); 
             }
+            
+            // Clean up extra newlines
             transcript = transcript.replace(/\n\n\n/g, "\n\n");
             
-            let element = document.createElement('a');
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(transcript));
-            element.setAttribute('download', story.name+'_Transcript.txt');
-            element.style.display = 'none';
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
+            console.log('✅ Transcript generated, length:', transcript.length);
+            
+            // Create safe filename
+            const filename = story.name.replace(/[^a-z0-9]/gi, '_') + '_Transcript.txt';
+            
+            // ✅ FIX: Use showSaveDialog WITHOUT defaultPath (macOS bug workaround)
+            try {
+                if (typeof Neutralino !== 'undefined' && Neutralino.os && Neutralino.filesystem) {
+                    console.log('📂 Calling Neutralino save dialog (without defaultPath - macOS workaround)');
+                    
+                    // Don't use defaultPath on macOS - it causes the dialog to fail!
+                    const savePath = await Neutralino.os.showSaveDialog('Save Transcript');
+                    
+                    console.log('📂 Save dialog returned:', savePath);
+                    
+                    if (savePath && savePath !== '') {
+                        // User selected a path, but we need to ensure it has .txt extension
+                        let finalPath = savePath;
+                        if (!finalPath.toLowerCase().endsWith('.txt')) {
+                            finalPath += '.txt';
+                        }
+                        
+                        console.log('💾 Writing file to:', finalPath);
+                        await Neutralino.filesystem.writeFile(finalPath, transcript);
+                        console.log('✅ File saved successfully!');
+                        Alpine.store('utils').showAlert('Transcript exported successfully!', 2000, false, 'notice');
+                        return;
+                    } else {
+                        console.log('ℹ️ User cancelled save');
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('❌ Save error:', err);
+                if (err.code && err.code !== 'NE_OS_DIACANC') {
+                    Alpine.store('utils').showAlert('Error saving file: ' + (err.message || 'Unknown error'));
+                }
+            }
         },
 
     }));
