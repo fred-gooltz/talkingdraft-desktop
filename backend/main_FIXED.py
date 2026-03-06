@@ -59,13 +59,11 @@ def get_whisper_model():
 async def api_handler(request: Request):
     """Main API endpoint"""
     
+    cmd = None
     try:
         # Parse form data
         form = await request.form()
         cmd = form.get('cmd')
-        
-        # ✅ DIAGNOSTIC: Log every command that comes in
-        print(f"📥 [API] Received command: {cmd}")
         
         if cmd == "listStories":
             return await list_stories()
@@ -98,23 +96,18 @@ async def api_handler(request: Request):
         else:
             raise HTTPException(status_code=400, detail=f"Unknown command: {cmd}")
             
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        # Log the full error with traceback
         import traceback
-        error_details = traceback.format_exc()
-        # Get the command that failed (if available)
-        try:
-            form_data = await request.form()
-            failed_cmd = form_data.get('cmd')
-        except:
-            failed_cmd = "UNKNOWN"
-        
-        print(f"❌ API Error in command: {failed_cmd}")
-        print(f"❌ Exception type: {type(e).__name__}")
-        print(f"❌ Exception message: {str(e)}")
-        print(f"❌ Full traceback:\n{error_details}")
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"❌ API Error in command '{cmd}': {error_msg}")
+        print(f"❌ Traceback:\n{traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
-            content={"error": str(e), "type": type(e).__name__, "command": failed_cmd}
+            content={"error": error_msg}
         )
 
 async def list_stories():
@@ -143,95 +136,39 @@ async def get_story(story_id: str):
 
 async def save_story(story_json: str, audio_file: UploadFile = None, tid: str = None):
     """Save story and optionally audio"""
-    print("🔵 [save_story] Starting save_story function")
-    print(f"🔵 [save_story] Received data - story_json length: {len(story_json) if story_json else 0}, audio_file: {'present' if audio_file else 'None'}, tid: {tid}")
-    
     try:
-        print("🔵 [save_story] Attempting to parse JSON...")
         story_data = json.loads(story_json)
         story_id = story_data.get('id')
-        print(f"✅ [save_story] Successfully parsed JSON. Story ID: {story_id}")
         
         if not story_id:
-            error_msg = "❌ [save_story] Error: Story ID is required but not provided"
-            print(error_msg)
             raise ValueError("Story ID required")
         
         story_data['updated'] = datetime.now().timestamp()
         
         # Save story JSON
         story_file = STORIES_DIR / f"{story_id}.json"
-        print(f"💾 [save_story] Saving story to {story_file}...")
-        
         with open(story_file, 'w') as f:
             json.dump(story_data, f, indent=2)
-        print(f"✅ [save_story] Successfully saved story to {story_file}")
         
         # Legacy: Save single audio if provided
         if audio_file and tid:
-            print(f"🔵 [save_story] Processing audio file with tid: {tid}")
             audio_path = AUDIO_DIR / f"{story_id}"
-            audio_file_path = audio_path / f"{tid}.webm"
+            audio_path.mkdir(exist_ok=True)
             
-            try:
-                # Check if audio directory exists, create if it doesn't
-                print(f"🔍 [save_story] Verifying audio directory: {audio_path}")
-                audio_path.mkdir(parents=True, exist_ok=True)
-                if audio_path.exists():
-                    print(f"✅ [save_story] Audio directory verified/created at: {audio_path}")
-                else:
-                    raise IOError(f"Failed to create audio directory: {audio_path}")
-                
-                # Read audio content
-                print(f"📥 [save_story] Reading audio content...")
+            audio_file_path = audio_path / f"{tid}.webm"
+            with open(audio_file_path, 'wb') as f:
                 content = await audio_file.read()
-                content_size = len(content)
-                print(f"📊 [save_story] Read {content_size} bytes of audio data")
-                
-                if not content:
-                    print("⚠️ [save_story] Warning: Audio file is empty")
-                
-                # Save audio file
-                print(f"💾 [save_story] Saving audio to {audio_file_path}...")
-                with open(audio_file_path, 'wb') as f:
-                    f.write(content)
-                
-                # Verify file was saved
-                if audio_file_path.exists():
-                    file_size = audio_file_path.stat().st_size
-                    print(f"✅ [save_story] Successfully saved audio: {tid}.webm")
-                    print(f"📊 [save_story] Audio file size: {file_size} bytes")
-                    
-                    # Verify file is not empty
-                    if file_size == 0:
-                        print("⚠️ [save_story] Warning: Saved audio file is empty")
-                else:
-                    raise IOError(f"Failed to verify saved audio file at: {audio_file_path}")
-                
-            except Exception as audio_error:
-                error_msg = f"❌ [save_story] Error processing audio file: {str(audio_error)}"
-                print(error_msg)
-                print(f"🔍 [save_story] Audio file path: {audio_file_path}")
-                print(f"🔍 [save_story] Audio directory exists: {audio_path.exists() if audio_path else 'N/A'}")
-                print(f"🔍 [save_story] Audio file exists: {audio_file_path.exists() if audio_file_path else 'N/A'}")
-                raise
+                f.write(content)
+            print(f"✅ Saved audio: {tid}.webm")
         
-        result = {
+        return {
             "id": story_id,
             "name": story_data.get('name'),
             "updated": story_data['updated']
         }
-        print(f"✅ [save_story] Successfully completed. Returning: {result}")
-        return result
         
     except json.JSONDecodeError as e:
-        error_msg = f"❌ [save_story] JSON decode error: {str(e)}"
-        print(error_msg)
         raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
-    except Exception as e:
-        error_msg = f"❌ [save_story] Unexpected error: {str(e)}"
-        print(error_msg)
-        raise
 
 async def touch_story(story_id: str):
     """Update only the timestamp of a story without modifying content"""
@@ -307,40 +244,20 @@ async def delete_story(story_id: str):
 
 async def get_audio(audio_id: str):
     """Get audio file - format: storyId-sceneId-trackId"""
-    print(f"🔍 [get_audio] Requested audio_id: {audio_id}")
-    
     parts = audio_id.split('-', 2)
     if len(parts) < 3:
-        print(f"❌ [get_audio] Invalid audio_id format (expected 3 parts, got {len(parts)})")
+        print(f"❌ Invalid audio ID format: {audio_id}")
         raise HTTPException(status_code=400, detail="Invalid audio ID")
     
     story_id = parts[0]
-    scene_id = parts[1]
     track_id = parts[2]
     
-    print(f"🔍 [get_audio] Parsed - story_id: {story_id}, scene_id: {scene_id}, track_id: {track_id}")
-    
     audio_file = AUDIO_DIR / story_id / f"{track_id}.webm"
-    print(f"🔍 [get_audio] Looking for audio at: {audio_file}")
     
     if not audio_file.exists():
-        print(f"⚠️  [get_audio] Audio file NOT FOUND at: {audio_file}")
-        print(f"⚠️  [get_audio] Returning empty audio - story will continue to work")
-        
-        # List what files DO exist in this directory (for debugging)
-        audio_dir = AUDIO_DIR / story_id
-        if audio_dir.exists():
-            print(f"🔍 [get_audio] Files that DO exist in {audio_dir}:")
-            for f in list(audio_dir.glob("*.webm"))[:5]:  # Show first 5 only
-                print(f"   - {f.name}")
-        else:
-            print(f"⚠️  [get_audio] Directory doesn't exist: {audio_dir}")
-        
-        # Return 204 No Content instead of 404 - frontend can handle this gracefully
-        from fastapi.responses import Response
-        return Response(status_code=204)
+        print(f"⚠️  Audio file not found: {audio_file}")
+        raise HTTPException(status_code=404, detail=f"Audio not found: {track_id}")
     
-    print(f"✅ [get_audio] Audio file found, returning: {audio_file}")
     return FileResponse(audio_file, media_type="audio/webm")
 
 async def copy_audio(new_story_id: str, tids_json: str):
@@ -419,7 +336,9 @@ async def batch_transcribe_mock(form):
         }
         
     except Exception as e:
-        print(f"Batch transcribe error: {e}")
+        print(f"❌ Batch transcribe error: {e}")
+        import traceback
+        print(f"❌ Traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 async def batch_transcribe_whisper(form):
@@ -453,57 +372,47 @@ async def batch_transcribe_whisper(form):
                 print(f"Skipping index {i}: missing tid or audio")
                 continue
             
-            # PREVIOUS APPROACH (riskier):
-            # We wrote audio to a temp file, transcribed it, then saved to permanent
-            # storage afterward. If Whisper crashed mid-scene, the audio bytes were
-            # lost because the permanent save never ran.
-            #
-            # with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp_file:
-            #     content = await audio_file.read()
-            #     tmp_file.write(content)
-            #     tmp_path = tmp_file.name
-            # result = model.transcribe(tmp_path, fp16=False)  # crash here = audio gone
-            # with open(permanent_audio_path, 'wb') as f:      # this never ran
-            #     with open(tmp_path, 'rb') as tmp_f:
-            #         f.write(tmp_f.read())
-            #
-            # CURRENT APPROACH (safer):
-            # Save audio to permanent storage FIRST, before touching Whisper.
-            # If transcription fails for any reason, the .webm is already on disk.
-            # The writer can re-open the scene and their recording is intact.
-            # We then transcribe directly from the permanent file, eliminating
-            # the temp file and the awkward double-read entirely.
-
-            content = await audio_file.read()
-            permanent_audio_path = audio_dir / f"{tid}.webm"
-
-            # Step 1: Commit audio to disk immediately
-            with open(permanent_audio_path, 'wb') as f:
-                f.write(content)
-            print(f"💾 Audio secured: {story_id}/{tid}.webm ({len(content)} bytes)")
-
+            # Save uploaded file temporarily for Whisper
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp_file:
+                content = await audio_file.read()
+                tmp_file.write(content)
+                tmp_path = tmp_file.name
+            
             try:
-                # Step 2: Transcribe from the permanent file
-                # Whisper requires a file path, not raw bytes - permanent file serves that role
+                # Transcribe with Whisper
                 print(f"🎤 Transcribing {tid}...")
-                result = model.transcribe(str(permanent_audio_path), fp16=False)
+                result = model.transcribe(tmp_path, fp16=False)
                 transcript_text = result["text"].strip()
-
+                
                 transcripts.append({
                     "tid": tid,
                     "transcript": transcript_text
                 })
-
+                
                 print(f"✅ {tid}: {transcript_text[:50]}...")
-
+                
+                # ✅ CRITICAL: Save the audio file to permanent storage
+                permanent_audio_path = audio_dir / f"{tid}.webm"
+                with open(permanent_audio_path, 'wb') as f:
+                    # Re-read from temp file since we already read it once
+                    with open(tmp_path, 'rb') as tmp_f:
+                        f.write(tmp_f.read())
+                print(f"💾 Saved audio: {story_id}/{tid}.webm")
+                
             except Exception as e:
-                # Audio is already saved - transcription failure is recoverable
-                print(f"❌ Transcription failed for {tid}: {e}")
-                print(f"⚠️  Audio file preserved at: {permanent_audio_path}")
+                print(f"❌ Error transcribing {tid}: {e}")
+                import traceback
+                print(f"❌ Traceback:\n{traceback.format_exc()}")
                 transcripts.append({
                     "tid": tid,
-                    "transcript": "[Transcription failed - audio preserved]"
+                    "transcript": "[Transcription failed]"
                 })
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
         
         print(f"✅ Batch transcription complete: {len(transcripts)} files processed")
         
@@ -513,7 +422,9 @@ async def batch_transcribe_whisper(form):
         }
         
     except Exception as e:
-        print(f"Batch transcribe error: {e}")
+        print(f"❌ Batch transcribe error: {e}")
+        import traceback
+        print(f"❌ Traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

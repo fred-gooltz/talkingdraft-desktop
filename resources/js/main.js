@@ -95,7 +95,7 @@ document.addEventListener('alpine:init', () => {
 		audioURL: '',
 		timer: 0,
 		timerDisplay: "00:00",
-		sceneMax: 600, // 10 minutes default
+		sceneMax: 1200, // 20 minutes default
 		transcribing: 0,
 		loading: 0,
 		
@@ -131,6 +131,11 @@ document.addEventListener('alpine:init', () => {
             
             // Keyboard shortcuts - keydown to prevent jingle
             document.addEventListener('keydown', (e) => {
+                // Don't interfere with any Cmd/Ctrl shortcuts (paste, copy, cut, etc.)
+                if (e.metaKey || e.ctrlKey) {
+                    return; // Let all Cmd/Ctrl shortcuts through
+                }
+                
                 // Prevent error jingle during active recording
                 if (this.mode == 'active') {
                     // Only handle number keys 0-9 and space/numpad decimal
@@ -245,10 +250,39 @@ document.addEventListener('alpine:init', () => {
             let stories = await Alpine.store('utils').apiReq(fd); 
             let tmp = [];
             if (stories && stories.length) {
-                for (const story of stories) { tmp.push(story); }
-                tmp.sort((a, b) => b.updated - a.updated);
+                for (const story of stories) { 
+                    // Normalize timestamp: convert milliseconds to seconds if needed
+                    if (story.updated && story.updated > 10000000000) {
+                        // This is in milliseconds (13+ digits), convert to seconds
+                        story.updated = story.updated / 1000;
+                    }
+                    tmp.push(story); 
+                }
+                
+                // DEBUG: Log timestamps before sorting
+                console.log('📊 BEFORE SORT:', tmp.map(s => ({
+                    name: s.name,
+                    updated: s.updated,
+                    date: s.updated ? new Date(s.updated * 1000).toLocaleString() : 'NO TIMESTAMP'
+                })));
+                
+                // Sort by updated timestamp (most recent first)
+                // Handle stories without timestamps by treating them as oldest
+                tmp.sort((a, b) => {
+                    const aTime = a.updated || 0;
+                    const bTime = b.updated || 0;
+                    return bTime - aTime;
+                });
+                
+                // DEBUG: Log timestamps after sorting
+                console.log('📊 AFTER SORT:', tmp.map(s => ({
+                    name: s.name,
+                    updated: s.updated,
+                    date: s.updated ? new Date(s.updated * 1000).toLocaleString() : 'NO TIMESTAMP'
+                })));
             }
             this.storyList = tmp;
+            console.log('📊 Stories loaded and sorted:', tmp.length, 'stories');
         },
 
         async loadStory (id) {
@@ -262,6 +296,15 @@ document.addEventListener('alpine:init', () => {
                     return false;
                 }
                 this.activeStory = story;
+                
+                // Update "last accessed" timestamp for this specific story
+                // Use a lightweight API call that only updates the timestamp
+                let fd = new FormData();
+                fd.append('cmd', 'touchStory');
+                fd.append('id', story.id);
+                await Alpine.store('utils').apiReq(fd);
+                console.log('🔄 Story access time updated');
+                
                 return true;
             }
             catch (err) { 
@@ -698,17 +741,32 @@ document.addEventListener('alpine:init', () => {
                         count: this.sessionBlobs.length
                     });
                     
-                    // Progress tracking (would need backend support for real progress)
+                    // Realistic progress simulation: estimate ~3-5 seconds per segment
+                    // Calculate estimated duration based on audio length
+                    const avgSecondsPerSegment = 4; // Whisper typically takes 3-5 seconds per audio segment
+                    const estimatedDuration = this.sessionBlobs.length * avgSecondsPerSegment * 1000; // in milliseconds
+                    const updateInterval = 100; // Update every 100ms for smooth animation
+                    const incrementsNeeded = Math.floor(estimatedDuration / updateInterval);
+                    const incrementPerUpdate = this.transcriptionProgress.total / incrementsNeeded;
+                    
                     let progressInterval = setInterval(() => {
-                        if (this.transcriptionProgress.current < this.transcriptionProgress.total) {
-                            this.transcriptionProgress.current++;
+                        if (this.transcriptionProgress.current < this.transcriptionProgress.total - 0.5) {
+                            // Increment smoothly, but never quite reach 100% until backend actually completes
+                            this.transcriptionProgress.current = Math.min(
+                                this.transcriptionProgress.current + incrementPerUpdate,
+                                this.transcriptionProgress.total - 0.5 // Stop at 99%
+                            );
                         }
-                    }, 1000);
+                    }, updateInterval);
                     
                     // Make API call
                     data = await Alpine.store('utils').apiReq(fd);
                     
+                    // Stop the progress animation
                     clearInterval(progressInterval);
+                    
+                    // Set to 100% when actually complete
+                    this.transcriptionProgress.current = this.transcriptionProgress.total;
                 }
                 
                 if (data.error) { 
@@ -1000,10 +1058,17 @@ document.addEventListener('alpine:init', () => {
 
             let idx = story.scenes.findIndex(s => s.id == scene.id);
             if (idx == -1) { return Alpine.store('utils').showAlert('Invalid scene.'); }
-            if (!confirm("Delete Scene?\n" + scene.name)) { return; }
-
-            story.scenes.splice(idx, 1);
-            Alpine.store('api').saveStory(story);
+            
+            // Show custom confirmation modal
+            this.showConfirmModal(
+                'Delete Scene?',
+                `Are you sure you want to delete "${scene.name}"? This cannot be undone.`,
+                () => {
+                    story.scenes.splice(idx, 1);
+                    Alpine.store('api').saveStory(story);
+                    Alpine.store('utils').showAlert('Scene deleted successfully', 2000, false, 'notice');
+                }
+            );
             
             return idx;
         },
@@ -1048,6 +1113,74 @@ document.addEventListener('alpine:init', () => {
                 scene.desc = value;
                 Alpine.store('api').saveStory(story);
             }
+        },
+
+        // 📝 TRANSCRIPT EDITING: Edit character names and dialogue/action text
+        editTrack(story, scene, tid, field, value) {
+            console.log('📝 [editTrack] Editing track:', tid, 'field:', field, 'value:', value);
+            
+            if (!story?.id) { 
+                return Alpine.store('utils').showAlert('Error: Invalid story.'); 
+            }
+            if (!scene?.id) { 
+                return Alpine.store('utils').showAlert('Error: Invalid scene.'); 
+            }
+            if (!scene.tracks || !scene.tracks[tid]) { 
+                return Alpine.store('utils').showAlert('Error: Invalid track.'); 
+            }
+            
+            value = value.toString().trim();
+            
+            if (field === 'name') {
+                // Editing character name
+                if (!value) {
+                    // Empty name - delete the entire track
+                    console.log('🗑️ [editTrack] Empty name - deleting track:', tid);
+                    this.deleteTrack(story, scene, tid);
+                    return;
+                }
+                
+                // Update character name (uppercase)
+                scene.tracks[tid].name = value.toUpperCase();
+                console.log('✅ [editTrack] Updated character name to:', scene.tracks[tid].name);
+                Alpine.store('api').saveStory(story);
+            }
+            
+            if (field === 'transcript') {
+                // Editing dialogue/action text
+                if (!value) {
+                    // Empty transcript - delete the entire track
+                    console.log('🗑️ [editTrack] Empty transcript - deleting track:', tid);
+                    this.deleteTrack(story, scene, tid);
+                    return;
+                }
+                
+                // Update transcript text
+                scene.tracks[tid].transcript = value;
+                console.log('✅ [editTrack] Updated transcript:', value.substring(0, 50) + '...');
+                Alpine.store('api').saveStory(story);
+            }
+        },
+
+        // 🗑️ TRANSCRIPT EDITING: Delete a track (removes from tracks and trackOrder)
+        deleteTrack(story, scene, tid) {
+            console.log('🗑️ [deleteTrack] Deleting track:', tid);
+            
+            if (!scene.tracks || !scene.tracks[tid]) { 
+                return; 
+            }
+            
+            // Remove from tracks object
+            delete scene.tracks[tid];
+            
+            // Remove from trackOrder array
+            const orderIdx = scene.trackOrder.indexOf(tid);
+            if (orderIdx > -1) {
+                scene.trackOrder.splice(orderIdx, 1);
+            }
+            
+            console.log('✅ [deleteTrack] Track deleted successfully');
+            Alpine.store('api').saveStory(story);
         },
 
         allChars (story) {

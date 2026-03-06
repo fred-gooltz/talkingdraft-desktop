@@ -68,6 +68,7 @@
                                 <option>Eight Sequences</option>
                                 <option>Save the Cat</option>
                                 <option>Story Circle</option>
+                                <option>9Cs</option>
                             </select>
                         </div>
                         <div><input x-model.number="newStoryMinutes" type="number" class="p-2 rounded drop-shadow w-16 bg-slate-600" value="90" /> minutes</div>
@@ -163,6 +164,7 @@
                             <option>Eight Sequences</option>
                             <option>Save the Cat</option>
                             <option>Story Circle</option>
+                            <option>9Cs</option>
                         </select>
                         <span x-text="time2ms(storyDuration(activeStory))+ ' of'"></span>
                         <input type="number" class="p-1 rounded text-gray-900 drop-shadow w-12" @change="setMinutes(activeStory, parseInt($el.value,10))" :value="activeStory?.minutes" />
@@ -202,7 +204,7 @@
                                                   x-model="section.value" 
                                                   class="w-full p-1 text-sm bg-transparent rounded border border-slate-500/0 hover:border-slate-500/50 focus:bg-slate-600 placeholder:text-slate-500 transition-colors duration-500" 
                                                   :placeholder="$store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.desc" 
-                                                  @change="Alpine.store('api').saveStory(activeStory)"></textarea>
+                                                  @change="console.log('Section edited, saving...'); Alpine.store('api').saveStory(activeStory)"></textarea>
                                     </div>
                                     
                                     <!-- Scene Cards with Drag & Drop -->
@@ -241,7 +243,7 @@
                                                                   class="italic w-full p-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent focus:bg-slate-600 text-sm transition-colors duration-500" 
                                                                   placeholder="Scene description. Max 100 words." 
                                                                   @change="editScene(activeStory,scene,'desc',$el.value.trim())" 
-                                                                  :value="scene.desc"></textarea>
+                                                                  x-model="scene.desc"></textarea>
                                                     </div>
                                                     
                                                     <!-- Drag Handle and Delete -->
@@ -338,7 +340,7 @@
                                   class="italic w-full p-1 mt-2 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
                                   placeholder="Scene description. Max 100 words." 
                                   @change="editScene(activeStory, activeScene, 'desc', $el.value.trim())" 
-                                  :value="activeScene.desc"></textarea>
+                                  x-model="activeScene.desc"></textarea>
                     </div>
 
                     <!-- Main Recording Interface -->
@@ -505,6 +507,7 @@
                         </div>
 
                         <!-- Transcript Display (Accordion - Closed by Default) -->
+                        <!-- 📝 TRANSCRIPT EDITING: Click any line to edit character names or dialogue/action text -->
                         <div class="w-full p-3 mt-3 max-h-48 overflow-auto border border-gray-300 rounded-lg" x-show="tView">
                             <div class="font-bold mb-2" x-text="activeScene?.name"></div>
                             
@@ -515,14 +518,65 @@
                             
                             <!-- Display saved transcripts from scene.tracks -->
                             <template x-for="tid of (activeScene?.trackOrder||[])" :key="tid">
-                                <div class="mb-2">
+                                <div class="mb-2" x-data="{editingName: false, editingTranscript: false}">
+                                    <!-- ACTION LINE -->
                                     <template x-if="activeScene?.tracks?.[tid]?.name == 'ACTION'">
-                                        <div x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+                                        <div class="relative group">
+                                            <!-- Display mode -->
+                                            <div x-show="!editingTranscript" 
+                                                 @click="editingTranscript = true; $nextTick(() => $refs.transcriptInput?.focus())" 
+                                                 class="cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
+                                                 x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+                                            
+                                            <!-- Edit mode -->
+                                            <textarea x-show="editingTranscript"
+                                                      x-ref="transcriptInput"
+                                                      :value="activeScene?.tracks?.[tid]?.transcript"
+                                                      @blur="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
+                                                      @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
+                                                      class="w-full p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm"
+                                                      rows="2"></textarea>
+                                        </div>
                                     </template>
+                                    
+                                    <!-- DIALOGUE LINE (Character + Text) -->
                                     <template x-if="activeScene?.tracks?.[tid]?.name != 'ACTION'">
                                         <div class="flex flex-col items-center">
-                                            <div class="font-bold" x-text="activeScene?.tracks?.[tid]?.name"></div>
-                                            <div class="w-3/4" x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+                                            <!-- Character Name (Editable) -->
+                                            <div class="relative group w-full flex justify-center">
+                                                <!-- Display mode -->
+                                                <div x-show="!editingName"
+                                                     @click="editingName = true; $nextTick(() => $refs.nameInput?.focus())"
+                                                     class="font-bold cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
+                                                     x-text="activeScene?.tracks?.[tid]?.name"></div>
+                                                
+                                                <!-- Edit mode -->
+                                                <input x-show="editingName"
+                                                       x-ref="nameInput"
+                                                       type="text"
+                                                       :value="activeScene?.tracks?.[tid]?.name"
+                                                       @blur="editTrack(activeStory, activeScene, tid, 'name', $event.target.value); editingName = false"
+                                                       @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'name', $event.target.value); editingName = false"
+                                                       class="w-32 text-center font-bold p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm" />
+                                            </div>
+                                            
+                                            <!-- Dialogue Text (Editable) -->
+                                            <div class="relative group w-3/4">
+                                                <!-- Display mode -->
+                                                <div x-show="!editingTranscript"
+                                                     @click="editingTranscript = true; $nextTick(() => $refs.transcriptInput?.focus())"
+                                                     class="cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
+                                                     x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+                                                
+                                                <!-- Edit mode -->
+                                                <textarea x-show="editingTranscript"
+                                                          x-ref="transcriptInput"
+                                                          :value="activeScene?.tracks?.[tid]?.transcript"
+                                                          @blur="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
+                                                          @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
+                                                          class="w-full p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm"
+                                                          rows="2"></textarea>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>

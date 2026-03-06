@@ -1,0 +1,253 @@
+<!-- Scrollable Content with Green Border -->
+							<div class="px-4 py-2 overflow-y-auto flex-1"
+								:class="{'border-2 border-[#2cd83d]': twoColumnMode}">
+								<!-- Scene name and controls -->
+								<div class="flex items-center gap-1">
+						    		<template x-if="!twoColumnMode">
+							    		<input type="text" 
+								    		class="scene-name-area w-full text-lg px-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
+								    		@focus="$el.select()" 
+								    		@change="editScene(activeStory,activeScene,'name',$el.value.trim())" 
+									    	:value="activeScene.name" />
+							    	</template>
+							    	<template x-if="twoColumnMode">
+								    	<div class="w-full text-lg px-1" x-text="activeScene.name"></div>
+								    </template>
+									
+									<!-- Nav buttons for single column only -->
+									<template x-if="!twoColumnMode">
+										<button :class="$store.utils.iconBtn" @click="setScene(activeStory, activeScene, -1)">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+											</svg>
+										</button>
+									</template>
+									<template x-if="!twoColumnMode">
+										<button :class="$store.utils.iconBtn" @click="setScene(activeStory, activeScene, 1)">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+											</svg>
+										</button>
+									</template>
+									
+									<!-- +/- button -->
+									<div class="relative z-10" x-data="{ open:false }" @keydown.escape.stop="open=false;" @click.outside="open=false">
+										<button :class="$store.utils.iconBtn" @click="open=!open" title="Scene Actions">
+											<svg x-show="!open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5 text-[#FFD905]">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+											</svg>
+											<svg x-show="open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5 text-[#FFD905]">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+											</svg>
+										</button>
+										<div x-show="open" @click="open=false;" :class="$store.utils.menuPopup" class="top-8 right-0 min-w-[140px]">
+											<div class="py-1">
+												<span :class="$store.utils.menuItem" @click="addScene(activeStory, activeScene.sectionIdx, activeScene.id, []) && setScene(activeStory, activeScene, 1)">Add Scene</span>
+												<span :class="$store.utils.menuItem" @click="let idx = deleteScene(activeStory, activeScene); setScene(activeStory, null, null, idx-1)">Delete Scene</span>
+											</div>
+										</div>
+									</div>
+								</div>
+								
+		                	    <!-- Scene description -->
+    							<template x-if="!twoColumnMode">
+    								<textarea rows="2" 
+	    								class="italic w-full p-1 mt-2 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
+		    							placeholder="Scene notes. Max 100 words." 
+			    						@change="editScene(activeStory,activeScene,'desc',$el.value.trim())" 
+				    					:value="activeScene.desc"></textarea>
+					    		</template>
+						    	<template x-if="twoColumnMode">
+							    	<div x-data="{ expanded: false }" class="w-full mt-2">
+								    	<div class="cursor-pointer" @click="expanded = !expanded">
+									    	<div class="italic w-full p-1 text-sm text-gray-300 transition-all duration-300"
+										    	:class="expanded ? 'max-h-[12rem] overflow-y-auto' : 'max-h-[4.5rem] overflow-hidden'"
+											    :style="expanded ? '' : 'display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;'"
+    											x-text="activeScene.desc || 'Scene notes. Max 100 words.'">
+	    									</div>
+		    							</div>
+			    					</div>
+				    			</template>
+				
+				                <div class="flex flex-col items-center mx-2 mb-2">
+                					<div class="w-full flex justify-between items-center px-2 mt-[10px]">
+			                         	<button :class="$store.utils.iconBtn" @click="showIns=!showIns">
+				                			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FFCC33]" x-show="showIns" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
+                							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FFCC33]" x-show="!showIns" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+	                						<span class="ml-1 text-xs" x-text="'Instructions'"></span>
+	                					</button>
+					                	<select class="p-1 text-sm bg-slate-500 rounded" @change="(activeStory.scenes[$el.value]?.chars && setSceneChars(activeStory, activeScene, activeStory.scenes[$el.value].chars) && $store.utils.showAlert('Characters copied from '+activeStory.scenes[$el.value].name, null, null, 'notice')); $el.value=-1"><option value="-1">Reuse characters from...</option><template x-for="(scene,idx) in activeStory?.scenes||[]" :key="scene.id"> <option :value="idx" x-text="scene.name" :disabled="scene.id == activeScene.id"></option></template></select>
+		                			</div>
+					                
+							<span class="text-sm text-gray-400">Characters</span>
+					            <!-- Instructions section -->
+            					<div class="flex flex-col gap-2 pt-1 px-3" x-show="showIns" x-transition>
+        						<div><span class="font-bold text-[#FFCC33]">1. </span><span class="text-sm">Click the numbered buttons to assign character names.</span></div>
+	        					<div><span class="font-bold text-[#FFCC33]">2. </span><span class="text-sm">Click the microphone to start transcribing. (It becomes "pause")</span></div>
+		        				<div><span class="font-bold text-[#FFCC33]">3. </span><span class="text-sm">Click a character name then talk their lines. (Repeat for all dialogue & Action)</span></div>
+			        			<div><span class="font-bold text-[#FFCC33]">4. </span><span class="text-sm">Click pause to stop transcribing.</span></div>
+				        	</div>
+
+                				<!-- Character buttons grid -->
+				        	    <div class="w-full flex flex-col items-center">
+                					<div class="w-full grid grid-cols-3 justify-items-center place-items-center gap-3 p-2 rounded-lg border-0 border-slate-500">
+				        			<template x-for="i in [7,8,9, 4,5,6, 1,2,3]" :key="i">
+					        			<div class="w-full flex flex-col items-center justify-center">
+							        		<button x-on:click="if (mode == 'setup') { charEdit = i; $nextTick(() => $refs.charName.select()) } else { startStopRecording(i, false) }" :class="{ ...sbtn, ...(currnum === i && mode == 'active')?abtn:{} }" :title="'While transcribing you can click this button or press '+i+' on your keyboard'">
+									        	<span class="overflow-hidden font-bold" x-text="activeScene?.chars?.[i]"></span>
+										        <span x-text="i" class="absolute bottom-1 right-1 px-1 text-xs text-[#FFD905] border-[#FFD905] border rounded-lg"></span>
+							        		</button>
+								        </div>
+						        	</template>
+							        <button x-on:click="if (mode == 'setup') { $store.utils.showAlert('Click the microphone to start transcribing') } else { startStopRecording(0, false) }" :class="{ 'col-span-2':1, 'h-16':1, 'font-bold':1, ...sbtn, ...(currnum === 0 && mode == 'active')?abtn:{} }" :title="'While transcribing you can click this button or press 0 on your keyboard'">ACTION<span class="absolute bottom-1 right-1 px-1 text-xs text-[#FFD905] border-[#FFD905]  border rounded-lg">0</span></button>
+			        				
+			        				<!-- ========== RECORD BUTTON - MAIN CLICKABLE AREA ========== -->
+			        				<!-- This is the primary call-to-action button for the entire app -->
+			        				<div x-on:click="activateRecording(activeScene, $refs.visualizer)" 
+			        				     class="record-button-wrapper flex items-center justify-center h-20 cursor-pointer"
+			        				     :class="mode == 'active' ? 'recording' : 'resting'">
+			        					
+			        					<!-- OUTER OVAL BORDER - Animated rotating gradient border (only in resting mode) -->
+			        					<div class="record-button-container">
+			        						
+			        						<!-- INNER CONTENT AREA - Contains microphone icon and text -->
+			        						<div class="record-button-content">
+			        							
+			        							<!-- RESTING STATE (Not Recording) -->
+			        							<template x-if="mode != 'active'">
+			        								<div class="flex flex-col items-center justify-center gap-1">
+			        									<!-- MICROPHONE ICON - Gray circle background with rotating shadow -->
+			        									<div class="mic-icon-wrapper">
+			        										<svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 19" fill="none">
+			        											<title>Start Transcribing</title>
+			        											<path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/>
+			        										</svg>
+			        									</div>
+			        									<!-- BUTTON TEXT - Below microphone -->
+			        									<span class="button-text">START TRANSCRIBING</span>
+			        								</div>
+			        							</template>
+			        							
+			        							<!-- ACTIVE/RECORDING STATE -->
+			        							<template x-if="mode == 'active'">
+			        								<div class="flex flex-col items-center justify-center gap-1">
+			        									<!-- MICROPHONE ICON - Green pause symbol, no animations -->
+			        									<div class="mic-icon-wrapper-active">
+			        										<svg class="mic-icon-active" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" stroke="currentColor">
+			        											<title>Stop Transcribing</title>
+			        											<path d="M224 432h-80V80h80zM368 432h-80V80h80z"/>
+			        										</svg>
+			        									</div>
+			        									<!-- BUTTON TEXT - Below microphone -->
+			        									<span class="button-text-active">STOP TRANSCRIBING</span>
+			        								</div>
+			        							</template>
+			        							
+			        						</div>
+			        					</div>
+			        				</div>
+			        			</div>
+				        	</div>
+
+        					<!-- Timer and audio display -->
+		        			<div class="w-full flex justify-between items-center mt-3">
+			        			<div x-show="mode=='active'" class="grow flex items-center rounded-full bg-white">
+					        		<div class="basis-2/12 text-red-700 text-center text-sm bg-white mx-2" x-text="timerDisplay"></div>
+							        <div class="basis-8/12 relative h-7 bg-gray-200 drop-shadow">
+							        	<div class="bg-[#FFCC33] h-full" :style="{width:(timer>sceneMax ? '100' : timer/sceneMax*100)+'%'}">&nbsp;</div>
+							        	<canvas id="viscanvas" x-ref="visualizer" class="absolute top-0 left-0 h-full w-full"></canvas>
+					        		</div>
+						        	<div class="basis-2/12 text-red-700 text-center text-sm bg-white mx-2" x-text="time2ms(sceneMax)"></div>
+						        </div>
+					        	<template x-if="mode=='setup' && !audioURL"><div class="grow text-center text-sm font-bold" :class="{'animate-pulse':loading}" x-text="loading ? 'LOADING AUDIO - PLEASE WAIT':'Transcribe up to a '+( Math.round((sceneMax/60 + Number.EPSILON) * 10) / 10 )+' minute scene'"></div></template>
+					        	<template x-if="mode=='setup' && audioURL && !loading"><audio controls class="grow h-7" :src="audioURL"></audio></template>
+				        	</div>
+
+        					<!-- Bottom buttons - STICKY when transcript is open -->
+                            <div class="w-full flex justify-between items-center mt-3 gap-2"
+                                :class="{'sticky top-0 bg-[#2D334A] z-10 pb-2': tView && twoColumnMode}">
+        						<button type="button" :class="$store.utils.iconBtn" @click="downloadTranscript(activeStory)"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[#FFD905]">  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg><span class="ml-1 text-sm font-bold" x-text="'Export Transcript'"></span></button>
+		        				<button type="button" :class="$store.utils.baseBtn" @click="toggleTranscript()"><span x-text="(tView ? 'Hide' : (twoColumnMode ? 'Edit' : 'Show')) + ' Transcript'"></span></button>
+				        		<div x-ref="tmover" class="grow" x-show="!twoColumnMode">&nbsp;</div>
+						        <button type="button" :class="$store.utils.baseBtn" @click="setScene(activeStory)" x-show="!twoColumnMode">Close</button>
+	        				</div>
+
+        					<!-- Transcript display area -->
+		        			<div class="transcript-display-area w-full p-3 mt-3 border border-gray-300 rounded-lg" :class="tView ? 'min-h-[30vh] max-h-[60vh] overflow-y-auto' : 'max-h-48 overflow-auto'" x-show="tView">
+				        		<div x-text="activeScene?.name"></div>
+						        <template x-if="!(activeScene?.trackOrder?.length)">
+						        	<p class="text-sm text-slate-500 cursor-pointer hover:text-slate-300 transition-colors" 
+						        	   @click="tView = false">
+						        		Start recording and your transcript will appear here. 
+						        		<span class="underline">Click here to record.</span>
+						        	</p>
+						        </template>
+						        <template x-for="tid of (activeScene?.trackOrder||[])" :key="tid"><div class="mb-2">
+						        	<template x-if="activeScene?.tracks?.[tid]?.name == 'ACTION'">
+						        		<div x-data="{editing: false}" class="mb-2">
+						        			<!-- Display mode (2-column) -->
+						        			<div x-show="!editing && twoColumnMode" 
+						        				 @click="editing = true; $nextTick(() => $refs.input?.focus())" 
+						        				 class="cursor-text p-2 rounded border border-transparent hover:border-slate-400/30 transition-colors"
+						        				 x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+						        			
+						        			<!-- Edit mode (2-column only) -->
+						        			<textarea x-show="editing && twoColumnMode"
+						        					  x-ref="input"
+						        					  :value="activeScene?.tracks?.[tid]?.transcript"
+						        					  @blur="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editing = false"
+						        					  @keydown.ctrl.enter="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editing = false"
+						        					  class="w-full p-2 rounded border border-slate-400 bg-slate-600 text-white text-sm"
+						        					  rows="3"></textarea>
+						        			
+						        			<!-- Read-only mode (1-column) -->
+						        			<div x-show="!twoColumnMode" 
+						        				 class="p-2"
+						        				 x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+						        		</div>
+						        	</template>
+						        	<template x-if="activeScene?.tracks?.[tid]?.name != 'ACTION'">
+						        		<div class="flex flex-col items-center mb-2" x-data="{editingName: false, editingText: false}">
+						        			<!-- Character Name -->
+						        			<div x-show="!editingName && twoColumnMode"
+						        				 @click="editingName = true; $nextTick(() => $refs.nameInput?.focus())"
+						        				 class="font-bold cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
+						        				 x-text="activeScene?.tracks?.[tid]?.name"></div>
+						        			
+						        			<input x-show="editingName && twoColumnMode"
+						        				   x-ref="nameInput"
+						        				   type="text"
+						        				   :value="activeScene?.tracks?.[tid]?.name"
+						        				   @blur="editTrack(activeStory, activeScene, tid, 'name', $event.target.value); editingName = false"
+						        				   @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'name', $event.target.value); editingName = false"
+						        				   class="font-bold p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm text-center w-48" />
+						        			
+						        			<div x-show="!twoColumnMode" class="font-bold" x-text="activeScene?.tracks?.[tid]?.name"></div>
+						        			
+						        			<!-- Dialogue Text -->
+						        			<div class="w-3/4 mt-1">
+						        				<div x-show="!editingText && twoColumnMode"
+						        					 @click="editingText = true; $nextTick(() => $refs.textInput?.focus())"
+						        					 class="cursor-text p-2 rounded border border-transparent hover:border-slate-400/30 transition-colors"
+						        					 x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+						        				
+						        				<textarea x-show="editingText && twoColumnMode"
+						        						  x-ref="textInput"
+						        						  :value="activeScene?.tracks?.[tid]?.transcript"
+						        						  @blur="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingText = false"
+						        						  @keydown.ctrl.enter="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingText = false"
+						        						  class="w-full p-2 rounded border border-slate-400 bg-slate-600 text-white text-sm"
+						        						  rows="3"></textarea>
+						        				
+						        				<div x-show="!twoColumnMode" class="p-2" x-text="activeScene?.tracks?.[tid]?.transcript"></div>
+						        			</div>
+						        		</div>
+						        	</template>
+						        </div></template>
+				        	</div>
+
+			        	</div>
+				        <!-- End of flex flex-col items-center mx-2 mb-2 -->
+				
+	        		</div>
+			        <!-- End of scrollable content -->

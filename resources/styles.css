@@ -4,9 +4,17 @@ body {
 
 #neutralinoapp {
     text-align: center;
-    -webkit-user-select: none;
-    user-select: none;
+    /* -webkit-user-select: none; */
+    /* user-select: none; */
     cursor: default;
+}
+
+/* Allow text selection in form elements */
+#neutralinoapp textarea,
+#neutralinoapp input[type="text"],
+#neutralinoapp input[type="number"] {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 #neutralinoapp h1{

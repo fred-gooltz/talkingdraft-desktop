@@ -172,10 +172,10 @@ export const apiStore = {
 			{ name: "Predicament & Lock In", act:"Act 1", st:.12, en:.25, desc:"Sets up the PREDICAMENT that will be central to the story, with first glimpses of possible obstacles. The main tension is established at the end of the act. The sequence ends when the main character is LOCKED IN the predicament, propelling her into a new direction to obtain her goal."	},
 			{ name: "First Obstacle & Raising the Stakes", act:"Act 2", st:.25, en:.37, desc:"The FIRST OBSTACLE to the central character is faced, and the beginning of the elimination of the alternatives begins, often a time where EXPOSITION left over from ACT I is brought out. Since our character is locked into the situation and can't simply walk away, there is a RAISING OF THE STAKES with a lot more to lose." },
 			{ name: "First Culmination & Midpoint", act:"Act 2", st:.37, en:.50, desc:"A higher OBSTACLE, the principle of RISING ACTION is brought in and builds to the FIRST CULMINATION, which usually parallels the RESOLUTION of the film. If the story is a tragedy and our hero dies, then the first culmination (or midpoint) should be a low point for our character. If, however, our hero wins in the end of the film, then sequence four should end with her winning in some way." },
-			{ name: "Subplot & Rising Action", act:"Act 2b", st:.50, en:.62, desc:"The second act sag may set in at this point if we don't have a strong SUBPLOT to take the ball for a while. We still want RISING ACTION, but we're not ready for the MAIN CULMINATION yet."	},
-			{ name: "Main Culmination & End of Act Two", act:"Act 2b", st:.62, en:.75, desc:"The build-up to the MAIN CULMINATION - back to the main story line with a vengeance. The highest obstacle, the last alternative, the highest or lowest moment and the end of our main tension come at this point. But we get the first inklings of the new tension that will carry us through the third act."	},
-			{ name: "New Tension & Twist", act:"Act 3", st:.75, en:.87, desc:"The full yet simple, brief establishment of the third act tension with its requisite exposition. Simpler, faster in nearly all ways, with rapid, short scenes and no real elaborate set-ups. The TWIST can end this sequence or come at the start of the eighth sequence." },
-			{ name: "Resolution", act:"Act 3", st:.87, en:1, desc:"Hell-bent for the RESOLUTION. Clarity is important. If they turn left, all is well, if they go right, the world as we know it ends. Not that we don't have complex emotions or ideas about what it all amounts to, but at this point we crave clarity. Will she get the girl, defuse the bomb, turn in her murderous brother and escape from the sinking boat surrounded by sharks?" },
+			{ name: "Subplot & Rising Action", act:"Act 3", st:.50, en:.62, desc:"The second act sag may set in at this point if we don't have a strong SUBPLOT to take the ball for a while. We still want RISING ACTION, but we're not ready for the MAIN CULMINATION yet."	},
+			{ name: "Main Culmination & End of Act Two", act:"Act 3", st:.62, en:.75, desc:"The build-up to the MAIN CULMINATION - back to the main story line with a vengeance. The highest obstacle, the last alternative, the highest or lowest moment and the end of our main tension come at this point. But we get the first inklings of the new tension that will carry us through the third act."	},
+			{ name: "New Tension & Twist", act:"Act 4", st:.75, en:.87, desc:"The full yet simple, brief establishment of the third act tension with its requisite exposition. Simpler, faster in nearly all ways, with rapid, short scenes and no real elaborate set-ups. The TWIST can end this sequence or come at the start of the eighth sequence." },
+			{ name: "Resolution", act:"Act 4", st:.87, en:1, desc:"Hell-bent for the RESOLUTION. Clarity is important. If they turn left, all is well, if they go right, the world as we know it ends. Not that we don't have complex emotions or ideas about what it all amounts to, but at this point we crave clarity. Will she get the girl, defuse the bomb, turn in her murderous brother and escape from the sinking boat surrounded by sharks?" },
 		]},
 		"Save the Cat" : { desc:"Blake Snyder's Hollywood method defines the key plot points and when they occur.", sections: [
 			{ name: 'Opening Image', act:"Act 1", st:0, en:.01, desc:"In one moment, we set the tone, mood, style, and scope of the story. It's a 'before' snapshot of the hero's world." },
@@ -186,23 +186,34 @@ export const apiStore = {
 			{ name: 'Break into Act II', act:"Act 2", st:.21, en:.22, desc:"A moment when the hero leaves the old world behind and chooses something new. A strong, definite change as the story proper begins." },
 			{ name: 'B Story Introduction', act:"Act 2", st:.22, en:.23, desc:"Sometimes the love story or introducing new characters. This beat gives us a break from the tension of the main story; it is a subplot to carry the theme of the story." },
 			{ name: 'Fun and Games', act:"Act 2", st:.23, en:.49, desc:"The heart of the story, promise of the premise, trailer moments. The stakes are not too high yet, the hero is exploring the new world of act 2." },
-			{ name: 'Midpoint', act:"Act 2b", st:.49, en:.50, desc:"The momentary threshold between the first half and the second half of the story; the stakes are raised; the fun and games are over. It's sometimes a false success, or more often something goes badly wrong." },
-			{ name: 'Bad Guy Closes In', act:"Act 2b", st:.50, en:.67, desc:"This section of the story is where the hero is really tested, the knife is twisted. Now a different challenge must be overcome. Perhaps the bad guys regroup and attack; or the hero's team begins to unravel." },
-			{ name: 'All is Lost', act:"Act 2b", st:.67, en:.68, desc:"A moment that puts your hero at her lowest point, she is beaten, the hero's life is in shambles. Blake talks of a 'whiff of death' at this point in a story, sometimes the mentor dies, perhaps symbolically. The old way of thinking dies. The hero may give up or run away, there seems no hope." },
-			{ name: 'Dark Night of the Soul', act:"Act 2b", st:.68, en:.76, desc:"The hero ruminates in the darkness before the dawn. Hero figures out the answer sometimes with insight from the B Story. She will pull out the last, best idea that will save herself and everyone around her." },
-			{ name: 'Break into Act III', act:"Act 3", st:.76, en:.77, desc:"The hero has dug deep, learned, changed, and found the solution. The stories carried by the theme and sub plot intertwine with the main plot. The hero has an idea to solve the problem and the end is in sight." },
-			{ name: 'Finale', act:"Act 3", st:.77, en:.99, desc:"The final act is where the hero triumphs and a new world order is revealed. The bad guys are dispatched, the problem is fixed." },
-			{ name: 'Final Image', act:"Act 3", st:.99, en:1, desc:"The closing scene should be the opposite of the opening scene; it is the proof that change has occurred and is real." },
+			{ name: 'Midpoint', act:"Act 3", st:.49, en:.50, desc:"The momentary threshold between the first half and the second half of the story; the stakes are raised; the fun and games are over. It's sometimes a false success, or more often something goes badly wrong." },
+			{ name: 'Bad Guy Closes In', act:"Act 3", st:.50, en:.67, desc:"This section of the story is where the hero is really tested, the knife is twisted. Now a different challenge must be overcome. Perhaps the bad guys regroup and attack; or the hero's team begins to unravel." },
+			{ name: 'All is Lost', act:"Act 3", st:.67, en:.68, desc:"A moment that puts your hero at her lowest point, she is beaten, the hero's life is in shambles. Blake talks of a 'whiff of death' at this point in a story, sometimes the mentor dies, perhaps symbolically. The old way of thinking dies. The hero may give up or run away, there seems no hope." },
+			{ name: 'Dark Night of the Soul', act:"Act 3", st:.68, en:.76, desc:"The hero ruminates in the darkness before the dawn. Hero figures out the answer sometimes with insight from the B Story. She will pull out the last, best idea that will save herself and everyone around her." },
+			{ name: 'Break into Act III', act:"Act 4", st:.76, en:.77, desc:"The hero has dug deep, learned, changed, and found the solution. The stories carried by the theme and sub plot intertwine with the main plot. The hero has an idea to solve the problem and the end is in sight." },
+			{ name: 'Finale', act:"Act 4", st:.77, en:.99, desc:"The final act is where the hero triumphs and a new world order is revealed. The bad guys are dispatched, the problem is fixed." },
+			{ name: 'Final Image', act:"Act 4", st:.99, en:1, desc:"The closing scene should be the opposite of the opening scene; it is the proof that change has occurred and is real." },
 		]},
 		"Story Circle" : { desc:"Dan Harmon's hero's journey structure for sitcoms and 'there-and-back-again' stories.", sections: [
 			{ name: "You", act:"Act 1", st:0, en:.12, desc:"A character is in a zone of comfort."	},
 			{ name: "Need", act:"Act 1", st:.12, en:.25, desc:"But they want something."	},
 			{ name: "Go", act:"Act 2", st:.25, en:.37, desc:"They enter an unfamiliar situation." },
 			{ name: "Search", act:"Act 2", st:.37, en:.50, desc:"Adapt to it." },
-			{ name: "Find", act:"Act 2b", st:.50, en:.62, desc:"Get what they wanted."	},
-			{ name: "Take", act:"Act 2b", st:.62, en:.75, desc:"Pay a heavy price for it."	},
-			{ name: "Return", act:"Act 3", st:.75, en:.87, desc:"Then return to their familiar situation." },
-			{ name: "Change", act:"Act 3", st:.87, en:1, desc:"Having changed." },
+			{ name: "Find", act:"Act 3", st:.50, en:.62, desc:"Get what they wanted."	},
+			{ name: "Take", act:"Act 3", st:.62, en:.75, desc:"Pay a heavy price for it."	},
+			{ name: "Return", act:"Act 4", st:.75, en:.87, desc:"Then return to their familiar situation." },
+			{ name: "Change", act:"Act 4", st:.87, en:1, desc:"Having changed." },
+		]},
+		"9Cs" : { desc:"Screenwriter & playwright Ed Horowitz has taught his 9Cs at UCLA, USC, Chapman, and other film schools in California.", sections: [
+			{ name: "Character", act:"Act 1", st:0, en:.10, desc:"Establish your main character (MC) in their Normal World which in some way embodies the thematic opposite of their eventual triumph." },
+			{ name: "Catalyst", act:"Act 1", st:.11, en:.13, desc:"The incident that creates the problem that sets the story in motion. The MC rejects the opportunity or denies the problem at first." },
+			{ name: "Clear Want", act:"Act 1", st:.14, en:.25, desc:"MC shifts between their initial want of the Normal World and a New Want created by the Catalyst. Establish the defining motivation and objective that drives plot to the end." },
+			{ name: "Conflict", act:"Act 2", st:.26, en:.48, desc:"This includes the Antagonist and other obstacles and challenges your main character will face." },
+			{ name: "Consciousness", act:"Act 2", st:.49, en:.52, desc:"The midpoint MOMENT in which your MC has an epiphany about their predicament that enables them to take more focused and directed action." },
+			{ name: "Collision", act:"Act 3", st:.53, en:.70, desc:"In Act 3 the MC's actions reach their goal and force the antagonist to respond in kind. As their wants collide, the stakes and tension rise." },
+			{ name: "Crisis", act:"Act 3", st:.71, en:.75, desc:"The MOMENT when the MC thinks they are the furthest from achieving their goal; they think they have failed." },
+			{ name: "Climax", act:"Act 4", st:.76, en:.97, desc:"The final conflict between MC and the antagonist in which the MC's action embodies the values of your theme and becomes the character's defining moment." },
+			{ name: "Change", act:"Act 4", st:.98, en:1, desc:"This demonstrates what has changed in the world of your story from beginning to end. Either the MC has changed or the world around them has changed, or both." },
 		]},
 	},
 
@@ -350,7 +361,9 @@ export const apiStore = {
 			throw rcd.error;
 		}
 
-		story.updated = rcd.updated || Date.now();
+		// Update timestamp from backend response or use current time
+		story.updated = rcd.updated || (Date.now() / 1000); // Backend uses seconds, convert
+		console.log('🔄 Story updated timestamp:', new Date(story.updated * 1000).toLocaleString());
 		return story;
 	},
 
