@@ -224,6 +224,7 @@ export const apiStore = {
 			"Eight Sequences" : [0],
 			"Save the Cat" : [0],
 			"Story Circle" : [0],
+			"9Cs": [0],
 		},
 		"Four Act" : {
 			"Free Form":     [0,0,0,0],
@@ -231,6 +232,7 @@ export const apiStore = {
 			"Eight Sequences" : [0,2,4,6],
 			"Save the Cat" : [0,2,4,6],
 			"Story Circle"   : [0,2,4,6],
+			"9Cs": [0, 3, 5, 7],
 		},
 		"Five Act TV" : {
 			"Free Form":     [0,0,0,0,0],
@@ -238,6 +240,7 @@ export const apiStore = {
 			"Eight Sequences" : [0,1,3,4,6],
 			"Save the Cat" : [0,1,3,4,6],
 			"Story Circle"   : [0,1,3,4,6],
+			"9Cs": [0, 2, 4, 6, 7],
 		},
 		"Eight Sequences" : {
 			"Free Form":      [0,0,0,0,0,0, 0, 0],
@@ -245,6 +248,7 @@ export const apiStore = {
 			"Five Act TV" :   [0,0,1,2,2,2, 3, 4],
 			"Save the Cat" :  [2,4,6,7,9,11,13,14],
 			"Story Circle"   :  [0,1,2,3,4,5, 6, 7],
+			"9Cs": [0, 2, 3, 3, 5, 6, 7, 8],
 		},
 		"Save the Cat" : {
 			"Free Form":      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -252,6 +256,7 @@ export const apiStore = {
 			"Five Act TV" :   [0,0,0,0,1,1,1,2,2,2,3,3,3,4,4],
 			"Eight Sequences" :  [0,0,0,1,1,1,2,3,4,4,5,5,6,6,7],
 			"Story Circle"   :  [0,0,0,1,1,1,2,3,4,4,5,5,6,6,7],
+			"9Cs": [0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 6, 7, 7, 8],
 		},
 		"Story Circle" :   {
 			"Free Form":      [0,0,0,0,0,0, 0, 0],
@@ -259,6 +264,15 @@ export const apiStore = {
 			"Five Act TV" :   [0,0,1,2,2,2, 3, 4],
 			"Eight Sequences" :  [0,1,2,3,4,5, 6, 7],
 			"Save the Cat" :  [2,4,6,7,9,11,13,14],
+			"9Cs": [0, 1, 3, 4, 5, 6, 7, 8],
+		},
+		"9Cs" : {  // FROM 9Cs TO other structures (9 entries each)
+			"Free Form":         [0, 0, 0, 0, 0, 0, 0, 0, 0],
+			"Four Act" :         [0, 0, 0, 1, 1, 2, 2, 3, 3],
+			"Five Act TV" :      [0, 1, 1, 2, 2, 3, 3, 4, 4],
+			"Eight Sequences":   [0, 0, 1, 2, 3, 4, 5, 6, 7],
+			"Save the Cat" :     [0, 3, 4, 7, 8, 9, 10, 13, 14],
+			"Story Circle" :     [0, 1, 2, 3, 4, 5, 6, 6, 7],
 		},
 	},
 	
@@ -271,7 +285,8 @@ export const apiStore = {
 			tracks: {}, 
 			trackOrder: [], 
 			duration: 0, 
-			chars: ["ACTION", "NAME-1", "NAME-2", "NAME-3", "NAME-4", "NAME-5", "NAME-6", "NAME-7", "NAME-8", "NAME-9"] 
+			chars: ["ACTION", "NAME-1", "NAME-2", "NAME-3", "NAME-4", "NAME-5", "NAME-6", "NAME-7", "NAME-8", "NAME-9"],
+			lastModified: Date.now()
 		};
 	},
 

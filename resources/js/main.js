@@ -98,6 +98,7 @@ document.addEventListener('alpine:init', () => {
 		sceneMax: 1200, // 20 minutes default
 		transcribing: 0,
 		loading: 0,
+		_pendingSceneLoad: null,  // Queue for scene load requests during loading
 		
 		// Session blobs - in-memory audio storage during recording
 		sessionBlobs: [],
@@ -1080,13 +1081,15 @@ document.addEventListener('alpine:init', () => {
             if (emptySec) {
                 if (story.scenes.findIndex(e => e.sectionIdx == i2) != -1) { return; }
                 story.scenes[i1].sectionIdx = i2;
-                let scene = story.scenes.splice(i1, 1)[0];
+                story.scenes[i1].lastModified = Date.now();
+				let scene = story.scenes.splice(i1, 1)[0];
                 let insIdx = story.scenes.findIndex((e,i) => e.sectionIdx > i2); 
                 insIdx = (insIdx == -1) ? story.scenes.length : insIdx; 
                 story.scenes.splice(insIdx, 0, scene);
             } else {
                 story.scenes[i1].sectionIdx = story.scenes[i2].sectionIdx;
-                story.scenes.splice(i2, 0, story.scenes.splice(i1, 1)[0]);
+                story.scenes[i1].lastModified = Date.now();
+				story.scenes.splice(i2, 0, story.scenes.splice(i1, 1)[0]);
             }
 
             Alpine.store('api').saveStory(story);
@@ -1103,6 +1106,7 @@ document.addEventListener('alpine:init', () => {
                     value = "EXT. " + value; 
                 }
                 scene.name = value.replace(/\n/g," ").trim().toUpperCase();
+                scene.lastModified = Date.now();
                 Alpine.store('api').saveStory(story);
             }
             if (field == 'desc') {
@@ -1111,6 +1115,7 @@ document.addEventListener('alpine:init', () => {
                     Alpine.store('utils').showAlert('Scene notes should be less than 100 words.'); 
                 }
                 scene.desc = value;
+                scene.lastModified = Date.now();
                 Alpine.store('api').saveStory(story);
             }
         },
@@ -1119,47 +1124,28 @@ document.addEventListener('alpine:init', () => {
         editTrack(story, scene, tid, field, value) {
             console.log('📝 [editTrack] Editing track:', tid, 'field:', field, 'value:', value);
             
-            if (!story?.id) { 
-                return Alpine.store('utils').showAlert('Error: Invalid story.'); 
-            }
-            if (!scene?.id) { 
-                return Alpine.store('utils').showAlert('Error: Invalid scene.'); 
+            if (!story?.id || !scene?.id || !tid) { 
+                return Alpine.store('utils').showAlert('Error: Invalid track.'); 
             }
             if (!scene.tracks || !scene.tracks[tid]) { 
                 return Alpine.store('utils').showAlert('Error: Invalid track.'); 
             }
             
-            value = value.toString().trim();
+            value = value?.toString().trim() || '';
+            
+            // Do NOT delete track if empty — avoids audio desync.
+            // Empty values are saved as-is.
             
             if (field === 'name') {
-                // Editing character name
-                if (!value) {
-                    // Empty name - delete the entire track
-                    console.log('🗑️ [editTrack] Empty name - deleting track:', tid);
-                    this.deleteTrack(story, scene, tid);
-                    return;
-                }
-                
-                // Update character name (uppercase)
-                scene.tracks[tid].name = value.toUpperCase();
+                scene.tracks[tid].name = value ? value.toUpperCase() : 'NAME';
                 console.log('✅ [editTrack] Updated character name to:', scene.tracks[tid].name);
-                Alpine.store('api').saveStory(story);
+            } else if (field === 'transcript') {
+                scene.tracks[tid].transcript = value;
+                console.log('✅ [editTrack] Updated transcript:', value.substring(0, 50));
             }
             
-            if (field === 'transcript') {
-                // Editing dialogue/action text
-                if (!value) {
-                    // Empty transcript - delete the entire track
-                    console.log('🗑️ [editTrack] Empty transcript - deleting track:', tid);
-                    this.deleteTrack(story, scene, tid);
-                    return;
-                }
-                
-                // Update transcript text
-                scene.tracks[tid].transcript = value;
-                console.log('✅ [editTrack] Updated transcript:', value.substring(0, 50) + '...');
-                Alpine.store('api').saveStory(story);
-            }
+            scene.lastModified = Date.now();
+            Alpine.store('api').saveStory(story);
         },
 
         // 🗑️ TRANSCRIPT EDITING: Delete a track (removes from tracks and trackOrder)
@@ -1211,6 +1197,7 @@ document.addEventListener('alpine:init', () => {
             if (!scene?.id) { return Alpine.store('utils').showAlert('Error: Invalid scene.'); }
             if (!chars?.length) { return; }
             scene.chars = JSON.parse(JSON.stringify(chars));
+            scene.lastModified = Date.now();
             Alpine.store('api').saveStory(story);
             return true;
         },
@@ -1227,6 +1214,7 @@ document.addEventListener('alpine:init', () => {
                 }
                 cn = cn.toUpperCase().trim();
                 scene.chars[n] = cn;
+                scene.lastModified = Date.now();
                 Alpine.store('api').saveStory(story);
                 return true;
             }

@@ -1,0 +1,38 @@
+# TalkingStudio — Goose Project Hints
+# Project: TalkingDraft-Desktop (TalkingStudio)
+# Path: ~/Documents/FRED-DEV/TALKINGDRAFT/desktop/TalkingDraft-Desktop
+
+## What This App Is
+TalkingStudio is a desktop app for screenwriters. Two-stage pipeline:
+- Stage 1 (Write): Voice dictation → formatted screenplay via local Whisper STT
+- Stage 2 (Produce): Locked script → podcast-ready audio via Voice Morph sidecar
+
+## Architecture
+- Frontend: Neutralino.js shell + Alpine.js UI (resources/index.html, resources/js/main.js)
+- Backend: FastAPI/Python (backend/main_FIXED.py) on port 5001
+- Data: ~/Documents/BespokeData/stories/ (JSON files, NEVER touch these)
+- Audio: ~/Documents/BespokeData/audio/ (WebM files, NEVER touch these)
+- Launch: ./Bespoke.command (waits for backend before opening UI)
+
+## Key Files
+- resources/index.html — main UI, Alpine.js components
+- resources/js/main.js — Alpine.js app logic, ui component
+- resources/js/lib/utils.js — alpineUtils store, apiStore (story structures)
+- backend/main_FIXED.py — FastAPI backend, all API routes
+- backend/requirements.txt — Python dependencies
+- Bespoke.command — launch script
+- Kill-Backend.command — kill script
+
+## API Contract
+Single endpoint: POST http://localhost:5001/api
+Commands via FormData: cmd=listStories, getStory, saveStory, deleteStory, batchTranscribe
+Never add REST routes — always add new commands to the existing POST /api handler.
+
+## Current Branding
+App name: TalkingStudio (was "Bespoke Writing Suite")
+Colors: bg-[#2D334A] dark, text-[#FFFFFE] white, accent #FFD905 yellow, #2CD83D green
+
+## Do Not Touch
+- BESPOKE-APP folder (Fred's personal daily driver)
+- ~/Documents/BespokeData/ (Fred's story data)
+- backend/main.py (old version, use main_FIXED.py only)
