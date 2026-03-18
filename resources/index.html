@@ -1,758 +1,336 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
-    <link rel="icon" type="image/png" href="favicon.png"/>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        ENV = {
-            API_URL: 'http://localhost:5001/api'
-        };
-        tailwind.config = {
-            theme: {
-                extend: {
-                    boxShadow: {
-                        'btn': '0 0.25em 0 #1b170e',
-                        'btn-hover': '0 0.15em 0 #1b170e',
-                        'in-deep': 'inset 0 2px 4px 0 rgb(0 0 0 / 0.75)',
-                    },
-                    dropShadow: {
-                        'rec': '0 0 .5rem #1ea42b',
-                        'rec-sm': '0 0 .25rem #1ea42b',
-                    }
-                }
-            }
-        };
-    </script>
-    <style>
-        [x-cloak] { display: none !important; }
-        
-        /* Spinner animation for transcription mode */
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .spinner {
-            animation: spin 1s linear infinite;
-        }
-    </style>
-    <title>TalkingStudio</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+  <title>TalkingStudio</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet"/>
+
+  <!-- Design system -->
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- ENV (injected before any module) -->
+  <script>
+    window.ENV = { API_URL: 'http://localhost:5001/api' };
+  </script>
 </head>
-<body class="bg-[#2D334A] text-[#FFFFFE]" x-data>
+<body>
 
-<div class="h-screen flex flex-col" x-show="onSwitch" x-data="ui" x-cloak>
-    
-    <!-- Header -->
-    <div class="bg-[#0E0726] text-[#FFFFFE] px-4 py-2 flex justify-between items-center">
-        <img src="icons/LONG-Logo_mic-white-SMALL.png" alt="Bespoke" class="h-8 cursor-pointer" @click="activeStory = {}; newOpen=1; window.history.replaceState({}, '', 'index.html')" />
+  <!-- ═══════════════════════════════════════════
+       STAGE BAR (nav)
+  ═══════════════════════════════════════════ -->
+  <div id="stage-bar">
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <img src="newlogo_transparent.png" class="logo-img" alt=""/>
+      <div class="wordmark">Talking<span>Studio</span></div>
     </div>
 
-    <!-- Story Dashboard - ONLY shows when newOpen==1 -->
-    <template x-if="newOpen==1">
-        <div class="flex-1 overflow-y-auto">
-            <div class="m-3" x-init="loadStories()">
-                <!-- Create New Story Module -->
-                <div class="text-3xl mb-3">Start a New Story</div>
-                <div class="p-5 rounded-xl border border-slate-500 hover:border-[#8694A0]">
-                    <div class="flex justify-between mb-2">
-                        <input type="text" x-model="newStoryName" class="p-2 rounded drop-shadow bg-slate-600 w-full" placeholder="Story name" />
-                    </div>
-                    <div class="flex flex-wrap justify-between gap-2">
-                        <div class="flex items-center">
-                            <select x-model="newStoryPreset" class="p-2 rounded drop-shadow bg-slate-600 italic border border-transparent hover:border-[#FFD905]">
-                                <option value="">Story Structure</option>
-                                <option>Free Form</option>
-                                <option>Four Act</option>
-                                <option>Five Act TV</option>
-                                <option>Eight Sequences</option>
-                                <option>Save the Cat</option>
-                                <option>Story Circle</option>
-                                <option>9Cs</option>
-                            </select>
-                        </div>
-                        <div><input x-model.number="newStoryMinutes" type="number" class="p-2 rounded drop-shadow w-16 bg-slate-600" value="90" /> minutes</div>
-                        <button :class="$store.utils.iconBtn" @click="newOpenStory(newStoryName, null, newStoryPreset, newStoryMinutes)">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            <span class="ml-1 text-sm font-bold">Create Story</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="h-16"></div>
-                
-                <!-- Story List -->
-                <div class="text-3xl mb-3">Your Stories</div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    <template x-for="story in storyList" :key="story.id">
-                        <div class="relative">
-                            <!-- Hamburger Menu -->
-                            <div class="absolute top-2 right-2 z-10" x-data="{open:false}" @click.outside="open=false">
-                                <button @click.stop="open=!open" class="p-1 rounded hover:bg-slate-600">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#FFD905]" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                    </svg>
-                                </button>
-                                <div x-show="open" class="origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20" role="menu">
-                                    <div class="py-1">
-                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; copyStory(story)">Copy Story</span>
-                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; renameStory(story)">Rename Story</span>
-                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; dnlStory=story">Export Story</span>
-                                        <span :class="$store.utils.menuItem" @click.prevent="open=false; deleteStory(story)">Delete Story</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Story Card -->
-                            <a :href="'index.html?sid='+story.id">
-                                <div class="relative p-5 rounded-xl border border-transparent bg-slate-500 hover:bg-transparent hover:border-[#FFCC33]">
-                                    <div class="text-lg font-bold" x-text="story.name"></div>
-                                    <div class="h-10"></div>
-                                    <div class="flex justify-between text-sm">
-                                        <div class="italic" x-text="story.sectionPreset"></div>
-                                        <div x-text="'Transcribed '+ time2ms(storyDuration(story)) +' of '+ story.minutes +' minutes'"></div>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-                    </template>
-                </div>
-                <div class="h-16"></div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Story Outliner View - ONLY shows when activeStory exists AND newOpen != 1 -->
-    <template x-if="activeStory?.id && activeStory?.scenes && newOpen != 1">
-        <div class="flex-1 overflow-y-auto">
-            <div class="pb-3">
-                <div class="w-full pt-3 px-3 mb-2 flex flex-wrap items-center justify-between">
-                    <!-- Story Nav -->
-                    <div class="relative z-10" x-data="{ open:false }" @click.stop="!open && loadStories(); open=!open" @keydown.escape.stop="open = false;" @click.outside="open=false">
-                        <div class="flex items-center cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFD905] hover:text-[#C29100]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                            </svg>
-                            <span x-text="activeStory.name" class="text-3xl hover:text-gray-500"></span>
-                        </div>
-                        <div x-show="open" class="origin-top-left absolute left-0 mt-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20" role="menu">
-                            <div class="py-1">
-                                <span :class="$store.utils.menuItem" @click.prevent="open=false; activeStory = {}; newOpen=1; window.history.replaceState({}, '', 'index.html')">New Story</span>
-                                <span :class="$store.utils.menuItem" @click.prevent="open=false; copyStory(activeStory)">Copy Story</span>
-                                <span :class="$store.utils.menuItem" @click.prevent="open=false; renameStory(activeStory)">Rename Story</span>
-                                <span :class="$store.utils.menuItem" @click.prevent="open=false; dnlStory=activeStory">Export Story</span>
-                                <span :class="$store.utils.menuItem" @click.prevent="open=false; deleteStory(activeStory)">Delete Story</span>
-                            </div>
-                            <div class="py-1 border-t" x-show="storyList.length">
-                                <span class="px-4 py-2 text-sm text-gray-400">Your Stories</span>
-                                <template x-for="story in storyList" :key="story.id">
-                                    <a x-text="story.name" :class="$store.utils.menuItem" :href="'index.html?sid='+story.id"></a>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- System Nav -->
-                    <div class="whitespace-nowrap text-sm">
-                        <span>Structure</span>
-                        <select class="p-1 mr-3 rounded text-gray-900 drop-shadow" :value="activeStory.sectionPreset" @change="migratePreset(activeStory, $el.value)">
-                            <option>Free Form</option>
-                            <option>Four Act</option>
-                            <option>Five Act TV</option>
-                            <option>Eight Sequences</option>
-                            <option>Save the Cat</option>
-                            <option>Story Circle</option>
-                            <option>9Cs</option>
-                        </select>
-                        <span x-text="time2ms(storyDuration(activeStory))+ ' of'"></span>
-                        <input type="number" class="p-1 rounded text-gray-900 drop-shadow w-12" @change="setMinutes(activeStory, parseInt($el.value,10))" :value="activeStory?.minutes" />
-                    </div>
-                </div>
-                
-                <!-- Story Sections -->
-                <div class="w-full pt-3 px-3 pb-2 flex flex-col">
-                    <template x-for="(section, idx) of activeStory.sections" :key="section?.id">
-                        <div x-data="{showSection:true}" 
-                             class="group relative w-full pr-4 pt-6 pb-6 mb-10 rounded-xl border hover:border-[#8694A0] border-slate-500"
-                             @drop.prevent="(activeStory.scenes.findIndex(e => e.sectionIdx == idx) == -1) && reorderScenes(activeStory, $event.dataTransfer.getData('idx'), idx, true);"
-                             @dragover.prevent="$event.dataTransfer.dropEffect = 'move';">
-                            
-                            <!-- Section Header -->
-                            <div class="absolute inset-x-0 top-0 flex justify-center cursor-pointer" @click="showSection=!showSection">
-                                <div class="px-2 rounded-b text-white text-sm bg-slate-500 group-hover:bg-[#8694A0] whitespace-nowrap hover:text-slate-300 cursor-pointer" 
-                                     @click.stop="$store.utils.showAlert($store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.name + '\n\n' + $store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.desc, null, true, 'special')">
-                                    <span x-text="$store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.name"></span>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-stretch pl-4">
-                                <div class="grow">
-                                    <div class="flex gap-1">
-                                        <div class="pt-1" x-show="activeStory.scenes.find(e => e.sectionIdx == idx)">
-                                            <svg xmlns="http://www.w3.org/2000/svg" :class="{...$store.utils.iconClk, 'w-6':1, 'h-6':1}" x-show="showSection" @click="showSection=!showSection" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <title>Hide Scenes</title>
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-                                            </svg>
-                                            <svg xmlns="http://www.w3.org/2000/svg" :class="{...$store.utils.iconClk, 'w-6':1, 'h-6':1}" x-show="!showSection" @click="showSection=!showSection" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <title>Show Scenes</title>
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </div>
-                                        <textarea :rows="(section.value.toString().match(/\n/g)||'').length + 1" 
-                                                  x-model="section.value" 
-                                                  class="w-full p-1 text-sm bg-transparent rounded border border-slate-500/0 hover:border-slate-500/50 focus:bg-slate-600 placeholder:text-slate-500 transition-colors duration-500" 
-                                                  :placeholder="$store.api.sectionPresets?.[activeStory.sectionPreset]?.sections?.[idx]?.desc" 
-                                                  @change="console.log('Section edited, saving...'); Alpine.store('api').saveStory(activeStory)"></textarea>
-                                    </div>
-                                    
-                                    <!-- Scene Cards with Drag & Drop -->
-                                    <div class="mt-2" x-show="showSection">
-                                        <template x-for="(scene, sceneIdx) of activeStory.scenes.filter(s => s.sectionIdx === idx)" :key="scene.id">
-                                            <div x-data="{dover:null}" 
-                                                 class="w-full p-3 bg-slate-600 mb-3 text-sm border rounded-xl" 
-                                                 :class="{'border-[#2CD83D]':dover==sceneIdx, 'border-transparent':dover!=sceneIdx}"
-                                                 draggable="true"
-                                                 @dragstart="$event.dataTransfer.setData('idx', activeStory.scenes.findIndex(s => s.id === scene.id))"
-                                                 @drop.prevent="$event.stopImmediatePropagation(); reorderScenes(activeStory, $event.dataTransfer.getData('idx'), activeStory.scenes.findIndex(s => s.id === scene.id)); dover=null;"
-                                                 @dragleave="dover=null;"
-                                                 @dragover.prevent="$event.dataTransfer.dropEffect = 'move'; dover=sceneIdx;">
-                                                
-                                                <!-- Talk Your Draft Button Row -->
-                                                <div class="w-full flex items-center justify-between gap-2 mb-2">
-                                                    <button :class="$store.utils.iconBtn" @click="setScene(activeStory, scene)" class="border border-[#FFD905]">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="fill-[#FFD905] w-4 h-4" viewBox="0 0 14 19" fill="none">
-                                                            <title>Talk Your Draft</title>
-                                                            <path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/>
-                                                        </svg>
-                                                        <span class="ml-1 text-xs font-bold">Talk Your Draft</span>
-                                                    </button>
-                                                    <div x-text="time2ms(scene?.duration)" title="Transcribed Minutes"></div>
-                                                </div>
-                                                
-                                                <!-- Location and Description Row -->
-                                                <div class="w-full flex gap-2">
-                                                    <div class="w-full flex flex-col items-center justify-between gap-2">
-                                                        <input type="text" 
-                                                               class="w-full p-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent focus:bg-slate-600 text-sm transition-colors duration-500" 
-                                                               @focus="$el.select()" 
-                                                               @change="editScene(activeStory,scene,'name',$el.value.trim())" 
-                                                               :value="scene.name" />
-                                                        <textarea rows="2" 
-                                                                  class="italic w-full p-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent focus:bg-slate-600 text-sm transition-colors duration-500" 
-                                                                  placeholder="Scene description. Max 100 words." 
-                                                                  @change="editScene(activeStory,scene,'desc',$el.value.trim())" 
-                                                                  x-model="scene.desc"></textarea>
-                                                    </div>
-                                                    
-                                                    <!-- Drag Handle and Delete -->
-                                                    <div class="flex flex-col items-center justify-between gap-2">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="cursor-move h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                            <title>Drag to Reorder Scenes</title>
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-                                                        </svg>
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" @click="deleteScene(activeStory, scene)">
-                                                            <title>Delete Scene</title>
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                                
-                                            </div>
-                                        </template>
-                                    </div>
-                                    
-                                    <!-- Add Scene Button -->
-                                    <div class="flex items-center justify-between mt-3">
-                                        <button :class="$store.utils.iconBtn" @click="addScene(activeStory, idx, null, []) && (showSection=true)">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                            </svg>
-                                            <span class="ml-1 text-xs font-bold">Add Scene</span>
-                                        </button>
-                                        <div class="px-2 py-1 rounded-lg bg-slate-500 text-sm whitespace-nowrap" title="Page Range" x-text="sectionBeats(activeStory.sectionPreset, idx, activeStory.minutes)"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Manual Diarization Modal - ONLY shows when activeScene exists -->
-    <template x-if="activeScene?.id">
-        <div class="fixed z-10 inset-0 overflow-y-auto" role="dialog" aria-modal="true" x-data="{showIns:false}">
-            <div class="flex items-baseline justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block">
-                <!-- Background overlay - clicking closes modal unless recording/transcribing -->
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="setScene(activeStory)"></div>
-                
-                <!-- Modal Content -->
-                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all max-w-3xl w-full sm:my-8 sm:align-middle">
-
-                    <!-- Scene Header -->
-                    <div class="px-4 py-2">
-                        <div class="flex items-center gap-1">
-                            <!-- Editable Scene Name -->
-                            <input type="text" 
-                                   class="w-full text-lg px-1 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
-                                   @focus="$el.select()" 
-                                   @change="editScene(activeStory, activeScene, 'name', $el.value.trim())" 
-                                   :value="activeScene.name" />
-                            
-                            <!-- Previous Scene Button -->
-                            <button :class="$store.utils.iconBtn" @click="setScene(activeStory, activeScene, -1)">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905" stroke-width="2">
-                                    <title>Previous Scene</title>
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-                            
-                            <!-- Next Scene Button -->
-                            <button :class="$store.utils.iconBtn" @click="setScene(activeStory, activeScene, 1)">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#FFD905" stroke-width="2">
-                                    <title>Next Scene</title>
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                            
-                            <!-- More Options Menu -->
-                            <div class="relative z-10" x-data="{ open:false }" @keydown.escape.stop="open=false;" @click.outside="open=false">
-                                <button :class="$store.utils.iconBtn" @click="open=!open">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#FFD905]" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                    </svg>
-                                </button>
-                                <div x-show="open" @click="open=false;" :class="$store.utils.menuPopup" class="top-8 right-0" role="menu" aria-orientation="vertical" tabindex="-1">
-                                    <div class="py-1" role="none">
-                                        <span role="menuitem" tabindex="-1" :class="$store.utils.menuItem" @click="addScene(activeStory, activeScene.sectionIdx, activeScene.id, []) && setScene(activeStory, activeScene, 1)">Add Scene</span>
-                                        <span role="menuitem" tabindex="-1" :class="$store.utils.menuItem" @click="let idx = deleteScene(activeStory, activeScene); setScene(activeStory, null, null, idx-1)">Delete Scene</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Scene Description -->
-                        <textarea rows="2" 
-                                  class="italic w-full p-1 mt-2 rounded border border-gray-400/0 hover:border-gray-400/50 bg-transparent text-sm transition-colors duration-500" 
-                                  placeholder="Scene description. Max 100 words." 
-                                  @change="editScene(activeStory, activeScene, 'desc', $el.value.trim())" 
-                                  x-model="activeScene.desc"></textarea>
-                    </div>
-
-                    <!-- Main Recording Interface -->
-                    <div class="flex flex-col items-center mx-2 mb-2">
-
-                        <!-- Instructions Toggle & Character Reuse -->
-                        <div class="w-full flex justify-between items-center px-2">
-                            <button :class="$store.utils.iconBtn" @click="showIns=!showIns">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FFCC33]" x-show="showIns" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-                                </svg>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FFCC33]" x-show="!showIns" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                </svg>
-                                <span class="ml-1 text-xs">Instructions</span>
-                            </button>
-                            
-                            <!-- Reuse Characters Dropdown -->
-                            <select class="p-1 text-sm bg-slate-500 rounded" 
-                                    @change="(activeStory.scenes[$el.value]?.chars && setSceneChars(activeStory, activeScene, activeStory.scenes[$el.value].chars) && $store.utils.showAlert('Characters copied from '+activeStory.scenes[$el.value].name, null, null, 'notice')); $el.value=-1">
-                                <option value="-1">Reuse characters from...</option>
-                                <template x-for="(scene, idx) in activeStory?.scenes||[]" :key="scene.id">
-                                    <option :value="idx" x-text="scene.name" :disabled="scene.id == activeScene.id"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Instructions Panel (collapsible) -->
-                        <div class="flex flex-col gap-2 pt-1 px-3" x-show="showIns" x-transition>
-                            <div><span class="font-bold text-[#FFCC33]">1. </span><span class="text-sm">Click the numbered buttons to assign character names.</span></div>
-                            <div><span class="font-bold text-[#FFCC33]">2. </span><span class="text-sm">Click the microphone to start transcribing. (It will then turn into a pause button)</span></div>
-                            <div><span class="font-bold text-[#FFCC33]">3. </span><span class="text-sm">Click a character name then talk their lines. (Repeat for all dialogue and Action lines)</span></div>
-                            <div><span class="font-bold text-[#FFCC33]">4. </span><span class="text-sm">Click pause to stop transcribing.</span></div>
-                        </div>
-
-                        <!-- Character Grid & Microphone -->
-                        <div class="w-full flex flex-col items-center">
-                            <div class="w-full grid grid-cols-3 justify-items-center place-items-center gap-3 p-2 rounded-lg border-0 border-slate-500">
-                                
-                                <!-- Character Buttons 7-9, 4-6, 1-3 -->
-                                <template x-for="i in [7,8,9, 4,5,6, 1,2,3]" :key="i">
-                                    <div class="w-full flex flex-col items-center justify-center">
-                                        <button @click="if (mode == 'setup') { charEdit = i; $nextTick(() => $refs.charName && $refs.charName.select()) } else { startStopRecording(i, false) }" 
-                                                :class="{ 
-                                                    'relative':1, 'p-4':1, 'w-full':1, 'h-24':1, 
-                                                    'flex':1, 'items-center':1, 'justify-center':1, 
-                                                    'rounded-lg':1, 'bg-slate-500':1, 'text-white':1, 
-                                                    'outline-none':1, 'border':1, 
-                                                    'hover:bg-transparent':1, 'hover:border-[#FFD905]':1, 
-                                                    'active:border-[#FFD905]':1, 'active:bg-transparent':1, 
-                                                    'duration-200':1,
-                                                    'bg-transparent': currnum === i && mode == 'active',
-                                                    'border-[#2cd83d]': currnum === i && mode == 'active',
-                                                    'border-transparent': !(currnum === i && mode == 'active')
-                                                }" 
-                                                :title="'While transcribing you can click this button or press '+i+' on your keyboard'">
-                                            <span class="overflow-hidden font-bold" x-text="activeScene?.chars?.[i]"></span>
-                                            <span x-text="i" class="absolute bottom-1 right-1 px-1 text-xs text-[#FFD905] border-[#FFD905] border rounded-lg"></span>
-                                        </button>
-                                    </div>
-                                </template>
-                                
-                                <!-- ACTION Button (0) -->
-                                <button @click="if (mode == 'setup') { $store.utils.showAlert('Click the microphone to start transcribing') } else { startStopRecording(0, false) }" 
-                                        :class="{ 
-                                            'col-span-2':1, 'h-16':1, 'font-bold':1, 
-                                            'relative':1, 'p-4':1, 'w-full':1, 
-                                            'flex':1, 'items-center':1, 'justify-center':1, 
-                                            'rounded-lg':1, 'bg-slate-500':1, 'text-white':1, 
-                                            'outline-none':1, 'border':1, 
-                                            'hover:bg-transparent':1, 'hover:border-[#FFD905]':1, 
-                                            'duration-200':1,
-                                            'bg-transparent': currnum === 0 && mode == 'active',
-                                            'border-[#2cd83d]': currnum === 0 && mode == 'active',
-                                            'border-transparent': !(currnum === 0 && mode == 'active')
-                                        }" 
-                                        title="While transcribing you can click this button or press 0 on your keyboard">
-                                    ACTION
-                                    <span class="absolute bottom-1 right-1 px-1 text-xs text-[#FFD905] border-[#FFD905] border rounded-lg">0</span>
-                                </button>
-                                
-                                <!-- Microphone/Pause Button -->
-                                <div @click="activateRecording(activeScene, $refs.visualizer)" class="flex items-center justify-center h-16">
-                                    <!-- Microphone Icon (Setup Mode) -->
-                                    <template x-if="mode!='active'">
-                                        <svg class="h-12 w-12 fill-[#FFCC33] p-2 bg-slate-500 rounded-full border border-transparent hover:bg-transparent hover:border-[#FFCC33] hover:cursor-pointer" 
-                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 19" fill="none">
-                                            <title>Start Transcribing</title>
-                                            <path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/>
-                                        </svg>
-                                    </template>
-                                    
-                                    <!-- Pause Icon (Active Mode) -->
-                                    <template x-if="mode=='active'">
-                                        <svg class="h-12 w-12 fill-[#2cd83d] p-2 bg-slate-500 rounded-full border border-transparent hover:bg-transparent hover:border-[#FFCC33] hover:cursor-pointer" 
-                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                                            <title>Pause Transcribing</title>
-                                            <path d="M224 432h-80V80h80zM368 432h-80V80h80z"/>
-                                        </svg>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- visCanvas Area - 4 States -->
-                        <div class="w-full flex justify-between items-center mt-3">
-                            
-                            <!-- STATE 1: ACTIVE MODE - Recording in progress -->
-                            <div x-show="mode=='active'" class="grow flex items-center rounded-full bg-white">
-                                <div class="basis-2/12 text-red-700 text-center text-sm bg-white mx-2" x-text="timerDisplay"></div>
-                                <div class="basis-8/12 relative h-7 bg-gray-200 drop-shadow">
-                                    <!-- Yellow progress bar -->
-                                    <div class="bg-[#FFCC33] h-full" :style="{width:(timer>sceneMax ? '100' : timer/sceneMax*100)+'%'}"></div>
-                                    <!-- Green waveform visualizer overlay -->
-                                    <canvas id="viscanvas" x-ref="visualizer" class="absolute top-0 left-0 h-full w-full"></canvas>
-                                </div>
-                                <div class="basis-2/12 text-red-700 text-center text-sm bg-white mx-2" x-text="time2ms(sceneMax)"></div>
-                            </div>
-                            
-                            <!-- STATE 2: SETUP MODE - Empty scene -->
-                            <template x-if="mode=='setup' && !audioURL">
-                                <div class="grow text-center text-sm font-bold" 
-                                     :class="{'animate-pulse':loading}" 
-                                     x-text="loading ? 'LOADING AUDIO - PLEASE WAIT' : 'Transcribe up to a '+( Math.round((sceneMax/60 + Number.EPSILON) * 10) / 10 )+' minute scene'">
-                                </div>
-                            </template>
-                            
-                            <!-- STATE 3: SETUP MODE - Scene with compiled audio -->
-                            <template x-if="mode=='setup' && audioURL">
-                                <audio controls class="grow h-7" :src="audioURL"></audio>
-                            </template>
-                            
-                            <!-- STATE 4: TRANSCRIPTION MODE - Batch processing (NEW!) -->
-                            <template x-if="mode=='transcription'">
-                                <div class="grow flex flex-col items-center justify-center py-2">
-                                    <!-- Spinner -->
-                                    <div class="spinner border-4 border-[#FFCC33] border-t-transparent rounded-full w-6 h-6 mb-1"></div>
-                                    
-                                    <!-- Status Message -->
-                                    <div class="text-center text-xs font-bold">
-                                        <div>Transcription in Progress</div>
-                                        <div class="text-slate-400 mt-1" x-text="`Processing ${Math.round((transcriptionProgress.current / transcriptionProgress.total) * 100)}%`"></div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-
-                        <!-- Export & Show Transcript Buttons -->
-                        <div class="w-full flex justify-between items-center mt-3 gap-2">
-                            <button type="button" :class="$store.utils.iconBtn" @click="downloadTranscript(activeStory)">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[#FFD905]">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                </svg>
-                                <span class="ml-1 text-sm font-bold">Export Transcript</span>
-                            </button>
-                            
-                            <button type="button" :class="$store.utils.baseBtn" @click="tView=!tView">
-                                <span x-text="(tView?'Hide':'Show') + ' Transcript'"></span>
-                            </button>
-                            
-                            <div class="grow">&nbsp;</div>
-                            
-                            <button type="button" :class="$store.utils.baseBtn" @click="setScene(activeStory)">Close</button>
-                        </div>
-
-                        <!-- Transcript Display (Accordion - Closed by Default) -->
-                        <!-- 📝 TRANSCRIPT EDITING: Click any line to edit character names or dialogue/action text -->
-                        <div class="w-full p-3 mt-3 max-h-48 overflow-auto border border-gray-300 rounded-lg" x-show="tView">
-                            <div class="font-bold mb-2" x-text="activeScene?.name"></div>
-                            
-                            <!-- No transcripts yet -->
-                            <template x-if="!(activeScene?.trackOrder?.length) && !sessionBlobs.length">
-                                <p class="text-sm text-slate-500">Start recording and your transcript will appear here.</p>
-                            </template>
-                            
-                            <!-- Display saved transcripts from scene.tracks -->
-                            <template x-for="tid of (activeScene?.trackOrder||[])" :key="tid">
-                                <div class="mb-2" x-data="{editingName: false, editingTranscript: false}">
-                                    <!-- ACTION LINE -->
-                                    <template x-if="activeScene?.tracks?.[tid]?.name == 'ACTION'">
-                                        <div class="relative group">
-                                            <!-- Display mode -->
-                                            <div x-show="!editingTranscript" 
-                                                 @click="editingTranscript = true; $nextTick(() => $refs.transcriptInput?.focus())" 
-                                                 class="cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
-                                                 x-text="activeScene?.tracks?.[tid]?.transcript"></div>
-                                            
-                                            <!-- Edit mode -->
-                                            <textarea x-show="editingTranscript"
-                                                      x-ref="transcriptInput"
-                                                      :value="activeScene?.tracks?.[tid]?.transcript"
-                                                      @blur="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
-                                                      @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
-                                                      class="w-full p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm"
-                                                      rows="2"></textarea>
-                                        </div>
-                                    </template>
-                                    
-                                    <!-- DIALOGUE LINE (Character + Text) -->
-                                    <template x-if="activeScene?.tracks?.[tid]?.name != 'ACTION'">
-                                        <div class="flex flex-col items-center">
-                                            <!-- Character Name (Editable) -->
-                                            <div class="relative group w-full flex justify-center">
-                                                <!-- Display mode -->
-                                                <div x-show="!editingName"
-                                                     @click="editingName = true; $nextTick(() => $refs.nameInput?.focus())"
-                                                     class="font-bold cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
-                                                     x-text="activeScene?.tracks?.[tid]?.name"></div>
-                                                
-                                                <!-- Edit mode -->
-                                                <input x-show="editingName"
-                                                       x-ref="nameInput"
-                                                       type="text"
-                                                       :value="activeScene?.tracks?.[tid]?.name"
-                                                       @blur="editTrack(activeStory, activeScene, tid, 'name', $event.target.value); editingName = false"
-                                                       @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'name', $event.target.value); editingName = false"
-                                                       class="w-32 text-center font-bold p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm" />
-                                            </div>
-                                            
-                                            <!-- Dialogue Text (Editable) -->
-                                            <div class="relative group w-3/4">
-                                                <!-- Display mode -->
-                                                <div x-show="!editingTranscript"
-                                                     @click="editingTranscript = true; $nextTick(() => $refs.transcriptInput?.focus())"
-                                                     class="cursor-text p-1 rounded border border-transparent hover:border-slate-400/30 transition-colors"
-                                                     x-text="activeScene?.tracks?.[tid]?.transcript"></div>
-                                                
-                                                <!-- Edit mode -->
-                                                <textarea x-show="editingTranscript"
-                                                          x-ref="transcriptInput"
-                                                          :value="activeScene?.tracks?.[tid]?.transcript"
-                                                          @blur="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
-                                                          @keydown.enter.prevent="editTrack(activeStory, activeScene, tid, 'transcript', $event.target.value); editingTranscript = false"
-                                                          class="w-full p-1 rounded border border-slate-400 bg-slate-600 text-white text-sm"
-                                                          rows="2"></textarea>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-                            
-                            <!-- Show pending message if session blobs exist -->
-                            <template x-if="sessionBlobs.length > 0">
-                                <div class="italic text-slate-400 mt-4">Pending transcription</div>
-                            </template>
-                        </div>
-
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Export Story Modal -->
-    <template x-if="dnlStory">
-        <div class="fixed z-30 inset-0 overflow-y-auto" role="dialog" aria-modal="true">
-            <div class="flex items-baseline justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div class="bg-[#2D334A] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start">
-                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 sm:mx-0 sm:h-10 sm:w-10">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5 text-[#FFD905]">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                </svg>
-                            </div>
-                            <div class="flex-grow mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                <h3 class="text-lg leading-6 font-medium">Export Story</h3>
-                                <div class="mt-2">
-                                    <select x-ref="dnlSel" class="p-2 rounded w-full border drop-shadow bg-slate-600 text-white">
-                                        <option value="transcript">Full Transcript</option>
-                                        <option value="outline">Full Outline</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="px-4 py-3 flex justify-end gap-2">
-                        <button type="button" :class="$store.utils.baseBtn" @click="dnlStory=null">Cancel</button>
-                        <button type="button" class="px-4 py-2 rounded-md border border-transparent bg-[#FFD905] text-[#1b170e] text-sm font-medium hover:bg-[#E5C400] shadow outline-none" @click="console.log('Export clicked', $refs.dnlSel.value, dnlStory); ($refs.dnlSel.value=='outline') ? downloadOutline(dnlStory) : downloadTranscript(dnlStory); dnlStory=null">Export</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Character Edit Modal -->
-    <template x-if="charEdit">
-        <div class="fixed z-20 inset-0 overflow-y-auto" role="dialog" aria-modal="true">
-            <div class="flex items-baseline justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div class="bg-[#2D334A] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start">
-                            <div class="flex-grow mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                <h3 class="text-lg leading-6 font-medium">Enter or select a character name</h3>
-                                <div class="mt-2 text-gray-500">
-                                    <input type="text" 
-                                           x-ref="charName" 
-                                           class="p-2 rounded w-full border drop-shadow text-gray-900" 
-                                           @keyup.enter="setCharName(activeStory, activeScene, charEdit, $refs.charName.value) && (charEdit=0)"
-                                           x-init="$nextTick(() => $refs.charName && $refs.charName.focus())"/>
-                                    <select x-ref="charSel" 
-                                            class="mt-1 p-2 rounded w-full border drop-shadow text-gray-900" 
-                                            @change="$refs.charName.value = $refs.charSel.value">
-                                        <option value="">Characters...</option>
-                                        <template x-for="c in allChars(activeStory)" :key="c">
-                                            <option :value="c" x-text="c"></option>
-                                        </template>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="px-4 py-3 flex justify-end gap-2">
-                        <button type="button" :class="$store.utils.baseBtn" @click="charEdit=0">Cancel</button>
-                        <button type="button" :class="$store.utils.baseBtn" @click="setCharName(activeStory, activeScene, charEdit, $refs.charName.value) && (charEdit=0)">Save</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Custom Confirmation/Prompt Modal (replaces native confirm/prompt) -->
-    <template x-if="modal.show">
-        <div class="fixed z-50 inset-0 overflow-y-auto" role="dialog" aria-modal="true">
-            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
-                <!-- Background overlay -->
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-                
-                <!-- Modal Content -->
-                <div class="inline-block align-bottom bg-[#2D334A] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div class="bg-[#2D334A] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start">
-                            <div class="flex-grow mt-3 text-center sm:mt-0 sm:text-left w-full">
-                                <h3 class="text-lg leading-6 font-medium text-[#FFFFFE] mb-3" x-text="modal.title"></h3>
-                                <div class="mt-2">
-                                    <p class="text-sm text-gray-300 mb-3" x-text="modal.message"></p>
-                                    
-                                    <!-- Input field for prompt type -->
-                                    <template x-if="modal.type === 'prompt'">
-                                        <input type="text" 
-                                               x-model="modal.inputValue" 
-                                               class="w-full p-2 rounded border border-gray-400 bg-slate-600 text-white" 
-                                               @keyup.enter="confirmModal()"
-                                               x-init="$nextTick(() => $el.focus())" />
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-[#2D334A] px-4 py-3 flex justify-end gap-2">
-                        <button type="button" 
-                                :class="$store.utils.baseBtn" 
-                                @click="cancelModal()">
-                            Cancel
-                        </button>
-                        <button type="button" 
-                                class="px-4 py-2 rounded-md border border-transparent bg-[#FFD905] text-[#1b170e] text-sm font-medium hover:bg-[#E5C400] shadow outline-none"
-                                @click="confirmModal()">
-                            <span x-text="modal.type === 'confirm' ? 'Delete' : 'OK'"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </template>
-
-</div>
-
-<!-- Alert Modal -->
-<template x-if="$store.utils.alertInfo.show">
-    <div class="fixed z-50 inset-x-0 top-2 h-fit w-fit mx-auto border-2 border-[#842029] rounded bg-[#F9D7DA] text-[#842029] text-sm">
-        <div class="flex items-center p-2 max-w-xl">
-            <span x-text="$store.utils.alertInfo.msg"></span>
-            <template x-if="$store.utils.alertInfo.modal">
-                <button type="button" class="mx-2 rounded-md border border-red-300 p-1 bg-white hover:bg-gray-100" @click="$store.utils.showAlert()">OK</button>
-            </template>
-        </div>
+    <!-- Tabs -->
+    <div id="t-dash"  class="tab tab-active"   onclick="App.go('dash')">
+      <span class="tab-n">0</span> Dashboard
     </div>
-</template>
+    <div id="t-td"    class="tab tab-disabled"  onclick="App.tclick('td')">
+      <span class="tab-n">1</span> TalkingDraft
+    </div>
+    <div id="t-ts"    class="tab tab-disabled"  onclick="App.tclick('ts')">
+      <span class="tab-n">2</span> TalkingStories
+    </div>
+    <div id="t-chem"  class="tab tab-disabled"  onclick="App.tclick('chem')">
+      <span class="tab-n">3</span> Chemistry
+    </div>
 
-<script src="js/neutralino.js"></script>
-<script>
-    // Initialize Neutralino
+    <!-- Bar right: toggle + help -->
+    <div class="bar-right">
+      <button class="tog-btn" id="togbtn" onclick="App.toggleLayout()" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/>
+        </svg>
+        <span id="togbtn-label">1 Col</span>
+      </button>
+      <button class="help-btn" onclick="App.showHelp()" title="Help">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </button>
+      <!-- User chip — settings placeholder -->
+      <div class="user-chip" onclick="App.showSettings()" title="Settings">
+        <div class="av">FG</div>
+        <span style="font-size:11px;color:var(--dim);">Fred</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       BODY — all 5 views live here simultaneously;
+       only one has class "on" at a time.
+  ═══════════════════════════════════════════ -->
+  <div id="body">
+
+    <!-- ── 0: Dashboard ── -->
+    <div class="view on" id="v-dash">
+      <!-- injected by dashboard.js -->
+    </div>
+
+    <!-- ── 2: TalkingDraft ── -->
+    <div class="view" id="v-td">
+      <!-- injected by talking-draft.js -->
+    </div>
+
+    <!-- ── 3: TalkingStories ── -->
+    <div class="view" id="v-ts">
+      <!-- injected by talking-stories.js -->
+    </div>
+
+    <!-- ── 4: Chemistry ── -->
+    <div class="view" id="v-chem">
+      <!-- injected by chemistry.js -->
+    </div>
+
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════
+       GLOBAL MODALS (z-index > views)
+  ═══════════════════════════════════════════ -->
+
+  <!-- Structure Chooser Modal -->
+  <div id="sm" onclick="if(event.target===this)App.closeStructureModal()">
+    <div class="smb">
+      <div class="sm-desc">
+        <div class="sm-desc-txt" id="sm-desc-txt">
+          Hover a structure to learn more. Click to select.
+        </div>
+      </div>
+      <div class="sg" id="sm-grid">
+        <!-- tiles injected by app.js -->
+      </div>
+      <div style="padding:10px 14px 14px;display:flex;justify-content:flex-end;gap:8px;">
+        <button class="ib" onclick="App.closeStructureModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm / Prompt Modal -->
+  <div id="cm" onclick="if(event.target===this)App.cancelModal()">
+    <div class="cmb">
+      <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;margin-bottom:8px;" id="cm-title"></div>
+      <div style="color:var(--ghost);font-size:12px;margin-bottom:12px;" id="cm-msg"></div>
+      <input id="cm-input" class="fi" style="width:100%;margin-bottom:12px;display:none;" type="text"
+             onkeyup="if(event.key==='Enter')App.confirmModal()"/>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button class="ib" onclick="App.cancelModal()">Cancel</button>
+        <button class="ab" id="cm-ok" onclick="App.confirmModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Toast -->
+  <div id="alert-toast"></div>
+
+  <!-- ══ EXPORT MODAL ═══════════════════════════════════════════ -->
+  <div id="em" class="ov" onclick="if(event.target===this)App.closeExportModal()">
+    <div class="ob" style="width:380px;">
+      <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;margin-bottom:4px;" id="em-title">Export</div>
+      <div style="font-size:11px;color:var(--ghost);margin-bottom:14px;" id="em-sub">Choose what to export:</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button id="em-opt1" style="padding:11px 14px;background:var(--surface);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--white);font-size:12px;text-align:left;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color .12s;" onmouseover="this.style.borderColor='rgba(186,232,232,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'"></button>
+        <button id="em-opt2" style="padding:11px 14px;background:var(--surface);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--white);font-size:12px;text-align:left;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color .12s;" onmouseover="this.style.borderColor='rgba(186,232,232,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'"></button>
+        <button id="em-opt3" style="padding:11px 14px;background:var(--surface);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--white);font-size:12px;text-align:left;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color .12s;" onmouseover="this.style.borderColor='rgba(186,232,232,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'"></button>
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+        <button class="ib" onclick="App.closeExportModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCENEDICTATION MODAL ══════════════════════════════════ -->
+  <!-- Launched by Talk Your Draft in 1-col view -->
+  <div id="rm" onclick="if(event.target===this)App.closeRM()">
+    <div class="rmb">
+
+      <!-- Header: slug (editable) + Prev / Next / ± -->
+      <div style="padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--card);border-radius:10px 10px 0 0;">
+        <div style="font-size:9px;color:rgba(255,216,0,0.6);font-family:'DM Mono',monospace;letter-spacing:0.08em;margin-right:4px;">SceneDictation</div>
+        <input type="text" id="rm-slug" style="flex:1;background:transparent;border:none;outline:none;font-family:'Courier Prime',monospace;font-size:13px;font-weight:700;color:var(--white);letter-spacing:0.03em;" placeholder="Scene slug"/>
+        <button class="ib" style="font-size:10px;" onclick="App.rmPrev()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg> Prev</button>
+        <button class="ib" style="font-size:10px;" onclick="App.rmNext()">Next <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>
+        <!-- ± Add/Delete scene -->
+        <div style="position:relative;">
+          <button class="ib" style="font-size:11px;font-weight:700;color:var(--yellow);padding:4px 8px;" onclick="App.togSA()" id="rm-sa-btn">
+            <svg id="rm-sa-plus" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            <svg id="rm-sa-minus" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><path d="M5 12h14"/></svg>
+          </button>
+          <div id="rm-sa-menu" style="display:none;position:absolute;right:0;top:calc(100% + 3px);background:var(--white);border-radius:5px;box-shadow:0 4px 16px rgba(0,0,0,0.4);min-width:130px;z-index:30;overflow:hidden;">
+            <div style="padding:7px 13px;font-size:12px;color:#1a1a2e;cursor:pointer;" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='white'" onclick="App.rmAddScene()">Add Scene</div>
+            <div style="padding:7px 13px;font-size:12px;color:#dc2626;cursor:pointer;" onmouseover="this.style.background='#fff0f0'" onmouseout="this.style.background='white'" onclick="App.rmDeleteScene()">Delete Scene</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable body -->
+      <div style="overflow-y:auto;display:flex;flex-direction:column;flex:1;">
+
+        <!-- Scene notes -->
+        <div style="padding:7px 14px;border-bottom:1px solid rgba(255,255,255,0.05);flex-shrink:0;">
+          <textarea rows="2" class="gta" id="rm-notes" style="font-size:12px;font-style:italic;" placeholder="Scene notes. Max 100 words."></textarea>
+        </div>
+
+        <!-- Instructions + Reuse row -->
+        <div style="padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:8px;align-items:center;flex-shrink:0;">
+          <button class="ib" style="font-size:10px;" onclick="App.rmToggleIns(this)">
+            <svg id="rm-ins-dn" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 9l-7 7-7-7"/></svg>
+            <svg id="rm-ins-up" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><path d="M5 15l7-7 7 7"/></svg>
+            Instructions
+          </button>
+          <!-- Reuse characters -->
+          <div style="position:relative;flex:1;">
+            <button class="ib" style="font-size:10px;width:100%;justify-content:space-between;" onclick="App.rmToggleReuse()">
+              <span>Reuse characters from…</span>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div id="rm-reuse-panel" style="display:none;position:absolute;top:32px;left:0;right:0;background:var(--raise);border:1px solid rgba(255,255,255,0.15);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.7);z-index:100;overflow:hidden;">
+              <div style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:9px;color:var(--ghost);font-family:'DM Mono',monospace;letter-spacing:0.05em;">SELECT A SCENE</span>
+                <button class="ab" style="font-size:9px;padding:3px 10px;" onclick="App.rmLoadChars()">Load</button>
+              </div>
+              <!-- 9-key preview (updates on hover) -->
+              <div id="rm-reuse-preview" style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.06);"></div>
+              <!-- Scene list -->
+              <div id="rm-reuse-list" style="max-height:150px;overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructions panel (hidden by default) -->
+        <div id="rm-ins-panel" style="display:none;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);background:var(--card);">
+          <div style="display:flex;gap:16px;">
+            <!-- Left: key layout + mini grid -->
+            <div style="flex-shrink:0;">
+              <div style="font-size:9px;color:var(--ghost);font-family:'DM Mono',monospace;letter-spacing:0.05em;margin-bottom:5px;">KEY LAYOUT</div>
+              <div style="display:flex;gap:5px;margin-bottom:7px;">
+                <button id="rm-kbd-np" class="ib ib-on" style="font-size:9px;" onclick="App.rmSetKbd('numpad')">Numpad</button>
+                <button id="rm-kbd-nr" class="ib" style="font-size:9px;" onclick="App.rmSetKbd('row')">Number Row</button>
+              </div>
+              <div id="rm-kbd-preview" style="display:inline-grid;grid-template-columns:repeat(3,26px);grid-template-rows:repeat(3,20px);gap:2px;"></div>
+            </div>
+            <!-- Right: SVG keyboard + steps -->
+            <div style="flex:1;">
+              <div style="font-size:8px;color:var(--ghost);font-family:'DM Mono',monospace;text-align:center;margin-bottom:4px;letter-spacing:0.05em;">TAP YOUR KEYS FOR SPEED</div>
+              <svg viewBox="0 0 180 72" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:200px;display:block;margin:0 auto 8px;">
+                <rect x="1" y="1" width="178" height="70" rx="5" fill="#1C1640" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+                <!-- Number row 1-9, even sized -->
+                <rect x="4" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="11" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">1</text>
+                <rect x="20" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="27" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">2</text>
+                <rect x="36" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="43" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">3</text>
+                <rect x="52" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="59" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">4</text>
+                <rect x="68" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="75" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">5</text>
+                <rect x="84" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="91" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">6</text>
+                <rect x="100" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="107" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">7</text>
+                <rect x="116" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="123" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">8</text>
+                <rect x="132" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="139" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">9</text>
+                <rect x="148" y="4" width="14" height="12" rx="2" fill="#38385A" stroke="rgba(255,255,255,0.1)" stroke-width="1"/><text x="155" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="rgba(255,255,255,0.3)">0</text>
+                <!-- QWERTY body filler -->
+                <text x="62" y="36" text-anchor="middle" font-family="DM Mono,monospace" font-size="7" fill="rgba(255,255,255,0.15)">QWERTY</text>
+                <!-- Numpad box -->
+                <rect x="136" y="20" width="40" height="50" rx="3" fill="#272344" stroke="rgba(255,216,0,0.2)" stroke-width="1"/>
+                <text x="156" y="28" text-anchor="middle" font-family="DM Mono,monospace" font-size="4" fill="rgba(255,216,0,0.4)">NUMPAD</text>
+                <!-- Numpad 7 8 9 / 4 5 6 / 1 2 3 -->
+                <rect x="138" y="30" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="143.5" y="37" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">7</text>
+                <rect x="151" y="30" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="156.5" y="37" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">8</text>
+                <rect x="164" y="30" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="169.5" y="37" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">9</text>
+                <rect x="138" y="41" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="143.5" y="48" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">4</text>
+                <rect x="151" y="41" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="156.5" y="48" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">5</text>
+                <rect x="164" y="41" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="169.5" y="48" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">6</text>
+                <rect x="138" y="52" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="143.5" y="59" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">1</text>
+                <rect x="151" y="52" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="156.5" y="59" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">2</text>
+                <rect x="164" y="52" width="11" height="9" rx="1" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/><text x="169.5" y="59" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="#FFD800">3</text>
+                <!-- Numpad 0 wide -->
+                <rect x="138" y="63" width="24" height="7" rx="1" fill="#38385A" stroke="rgba(255,255,255,0.15)" stroke-width="1"/><text x="150" y="69" text-anchor="middle" font-family="DM Mono,monospace" font-size="5" fill="rgba(255,255,255,0.4)">0</text>
+              </svg>
+            </div>
+          </div>
+          <!-- Steps below -->
+          <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:8px;margin-top:4px;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--yellow);margin-bottom:6px;letter-spacing:0.05em;">TAP 0–9 ON YOUR KEYBOARD TO CHANGE CHARACTERS WHILE SPEAKING</div>
+            <div style="margin-bottom:3px;"><span style="color:var(--yellow);font-weight:700;">1. </span><span style="font-size:11px;">Click the numbered buttons to assign character names.</span></div>
+            <div style="margin-bottom:3px;"><span style="color:var(--yellow);font-weight:700;">2. </span><span style="font-size:11px;">Click the microphone to start transcribing. (It becomes “pause”)</span></div>
+            <div style="margin-bottom:3px;"><span style="color:var(--yellow);font-weight:700;">3. </span><span style="font-size:11px;">Tap a character button then talk their lines. (Action lines = ∅)</span></div>
+            <div><span style="color:var(--yellow);font-weight:700;">4. </span><span style="font-size:11px;">Click pause to stop transcribing.</span></div>
+          </div>
+        </div>
+
+        <!-- Character numpad -->
+        <div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.04);flex-shrink:0;">
+          <div class="npd" id="rm-npd"></div>
+        </div>
+
+        <!-- Wave / recording status area -->
+        <div class="rb" style="padding:8px 14px;" id="rm-wave">
+          <div id="rm-wave-setup" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
+            <span style="font-size:11px;color:var(--ghost);">Tap the mic to begin</span>
+            <span id="rm-wave-max" style="font-size:9px;color:rgba(107,122,153,0.6);font-family:'DM Mono',monospace;"></span>
+          </div>
+          <div id="rm-wave-active" style="flex:1;display:none;align-items:center;gap:6px;">
+            <span class="rt" id="rm-timer">00:00</span>
+            <div class="rw">
+              <div class="rf" id="rm-progress" style="width:0%"></div>
+              <div class="rc"></div>
+              <canvas id="rm-viscanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+            </div>
+            <span class="rt" id="rm-max"></span>
+          </div>
+          <div id="rm-wave-transcribing" style="flex:1;display:none;align-items:center;justify-content:center;gap:8px;">
+            <div class="spinner" style="width:16px;height:16px;border:2px solid var(--yellow);border-top-color:transparent;border-radius:50%;"></div>
+            <span style="font-size:11px;color:var(--ghost);">Transcribing… <span id="rm-trans-pct">0%</span></span>
+          </div>
+          <audio id="rm-audio" controls style="flex:1;display:none;height:28px;"></audio>
+        </div>
+
+        <!-- Transcript (hidden by default, read-only, click line = go to TalkingStories) -->
+        <div id="rm-transcript" style="display:none;max-height:210px;overflow-y:auto;padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);">
+          <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(186,232,232,0.3);font-style:italic;margin-bottom:8px;text-align:center;">Double-click any line to edit in TalkingStories</div>
+          <div id="rm-transcript-body"></div>
+        </div>
+
+        <!-- Bottom bar: Export + Show Transcript + Close -->
+        <div style="padding:7px 14px 10px;border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+          <div style="display:flex;gap:7px;">
+            <button class="ib" style="font-size:10px;" onclick="App.openExportModal('td')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Export
+            </button>
+            <button class="ib" style="font-size:10px;" id="rm-ts-btn" onclick="App.rmToggleTranscript()">
+              Show Transcript
+            </button>
+          </div>
+          <button class="ib" style="color:var(--ghost);font-size:10px;" onclick="App.closeRM()">Close</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════
+       SCRIPTS — load order matters
+  ═══════════════════════════════════════════ -->
+  <script src="js/neutralino.js"></script>
+  <script>
     Neutralino.init();
-    
-    // Dev Tools Shortcuts
-    document.addEventListener('keydown', async (e) => {
-        // Cmd+R or Ctrl+R to reload
-        if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
-            e.preventDefault();
-            location.reload();
-        }
+    // Dev tools: Cmd+R reload
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'r') { e.preventDefault(); location.reload(); }
     });
-</script>
-<script type="module">
-    console.log('🚀 Starting app initialization...');
-    
-    // Import Alpine as a module
-    const Alpine = (await import('https://unpkg.com/alpinejs@3.10.1/dist/module.esm.js')).default;
-    window.Alpine = Alpine;
-    console.log('📦 Alpine loaded as module');
-    
-    // Import main.js to register components
-    await import('./js/main.js');
-    console.log('✅ main.js imported');
-    
-    // Now start Alpine
-    Alpine.start();
-    console.log('🎯 Alpine.start() called');
-</script>
+  </script>
+
+  <!-- App bootstrap (module) -->
+  <script type="module" src="js/app.js"></script>
+
 </body>
 </html>

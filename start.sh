@@ -1,41 +1,45 @@
 #!/bin/bash
 
-# Bespoke App - Quick Start Script with Virtual Environment
+# TalkingStudio — Quick Start Script
 
-echo "🚀 Starting Bespoke Writing Suite..."
-echo ""
+echo "🚀 Starting TalkingStudio..."
 
-# Navigate to project root
 cd "$(dirname "$0")"
 
-# Check if virtual environment exists, create if not
-if [ ! -d "backend/venv" ]; then
-    echo "📦 Creating virtual environment..."
+# Rebuild venv if broken or missing
+if [ ! -f "backend/venv/lib/python3.13/site-packages/fastapi/__init__.py" ]; then
+    echo "📦 Setting up Python environment..."
     cd backend
+    rm -rf venv
     python3 -m venv venv
     source venv/bin/activate
-    pip install -r requirements.txt
-    echo "✅ Virtual environment created"
+    pip install --quiet fastapi uvicorn python-multipart
+    echo "✅ Python environment ready"
     cd ..
 else
-    echo "✅ Virtual environment found"
+    echo "✅ Python environment found"
 fi
 
-# Activate virtual environment and start backend
-echo "🐍 Starting Python backend on port 5001..."
+# Start backend
+echo "🐍 Starting backend on port 5001..."
 cd backend
 source venv/bin/activate
-python main.py &
+python3 main_FIXED.py &
 BACKEND_PID=$!
 cd ..
 
-# Wait for backend to start
+# Wait for backend
 sleep 2
 
-# Start Neutralino app
-echo "🖥️  Starting Neutralino app..."
+# Verify backend started
+if ! curl -s http://127.0.0.1:5001/health > /dev/null 2>&1; then
+    echo "⚠️  Backend may still be starting..."
+fi
+
+# Start Neutralino
+echo "🖥️  Starting TalkingStudio window..."
 neu run
 
-# Cleanup - kill backend when Neutralino closes
-kill $BACKEND_PID
+# Cleanup
+kill $BACKEND_PID 2>/dev/null
 echo "✅ Shutdown complete"

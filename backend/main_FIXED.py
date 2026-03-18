@@ -51,7 +51,7 @@ def get_whisper_model():
     global WHISPER_MODEL
     if WHISPER_MODEL is None and WHISPER_AVAILABLE:
         print("🧠 Loading Whisper model (base)... This may take a moment...")
-        WHISPER_MODEL = whisper.load_model("base")
+        WHISPER_MODEL = whisper.load_model("base.en")
         print("✅ Whisper model loaded and ready")
     return WHISPER_MODEL
 
