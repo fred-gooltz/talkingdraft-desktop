@@ -206,6 +206,13 @@ function initTD(story) {
 function renderSceneList(story) {
   const list = document.getElementById('td-scene-list');
   if (!list) return;
+
+  // Snapshot collapsed sections before rebuilding
+  const collapsed2col = new Set();
+  list.querySelectorAll('.tdsec-body').forEach((body, i) => {
+    if (body.style.display === 'none') collapsed2col.add(i);
+  });
+
   const nameEl = document.getElementById('td-story-name');
   if (nameEl) nameEl.textContent = story.name;
   const structBtn = document.getElementById('td-struct-btn');
@@ -254,6 +261,20 @@ function renderSceneList(story) {
     '<button class="ab" style="width:100%;margin-top:6px;font-size:10px;justify-content:center;" onclick="TD.addSection()">' +
       '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg> Add Section' +
     '</button>' : '');
+
+  // Restore collapsed sections
+  if (collapsed2col.size > 0) {
+    list.querySelectorAll('.tdsec-body').forEach((body, i) => {
+      if (collapsed2col.has(i)) {
+        body.style.display = 'none';
+        const hdr = body.previousElementSibling;
+        if (hdr) {
+          const chev = hdr.querySelector('.tdsec-chev');
+          if (chev) chev.style.transform = '';
+        }
+      }
+    });
+  }
 }
 
 // ── pp/time display helper ─────────────────────────────────────────────────────
@@ -297,10 +318,11 @@ function sceneCard2col(scene, absIdx) {
     'ondragleave="TD._dragLeave(event)" ' +
     'style="cursor:pointer;margin-bottom:6px;' + border + '">' +
     '<div style="display:flex;flex-direction:column;gap:4px;padding:6px 8px;flex:1;min-width:0;">' +
-      // C: editable name input
+      // C: editable name input with oninput uppercase enforcement
       '<input class="gi" style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600;" ' +
         'value="' + nameVal + '" ' +
-        'onchange="TD.editSceneName(' + absIdx + ',this.value)" ' +
+        'onblur="TD.editSceneNameById(\''+scene.id+'\',this.value)" ' +
+        'oninput="this.value=this.value.toUpperCase();var s=document.getElementById(\'td-rec-slug\');if(s&&App.state.activeScene?.id===\''+scene.id+'\')s.textContent=this.value;" ' +
         'onfocus="TD.selectScene(' + absIdx + ');this.select()" ' +
         'onclick="event.stopPropagation()"/>' +
       // B: textarea onfocus loads scene
@@ -308,18 +330,19 @@ function sceneCard2col(scene, absIdx) {
         'placeholder="Scene notes. Max 100 words." ' +
         'onchange="TD.editSceneDesc(' + absIdx + ',this.value)" ' +
         'onfocus="TD.selectScene(' + absIdx + ')">' + descVal + '</textarea>' +
+      // D+K: pp display then done checkbox to its right
       '<div style="display:flex;align-items:center;gap:6px;">' +
-        // K: pp/time toggle
-        '<span class="pp-toggle" style="font-family:\'DM Mono\',monospace;font-size:8px;color:' + ppColor + ';" ' +
+        '<span class="pp-toggle" style="font-family:\'DM Mono\',monospace;font-size:10px;color:' + ppColor + ';" ' +
           'onclick="event.stopPropagation();TD.togglePPMode()" title="Click to toggle pp / time">' + display + '</span>' +
+        '<div class="sc-done-wrap' + (isDone ? ' done' : '') + '" onclick="event.stopPropagation();TD.toggleDone(' + absIdx + ')" title="Mark scene complete">' +
+          '<div class="sc-done-box"></div>' +
+          '<span class="sc-done-label">' + (isDone ? 'complete' : '') + '</span>' +
+        '</div>' +
       '</div>' +
     '</div>' +
-    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 4px 6px 0;gap:8px;flex-shrink:0;">' +
-      // D: manual completion checkbox
-      '<div class="sc-done' + (isDone ? ' done' : '') + '" ' +
-        'title="Mark scene complete" ' +
-        'onclick="event.stopPropagation();TD.toggleDone(' + absIdx + ')"></div>' +
-      '<svg class="dh" title="Drag to reorder" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" onclick="event.stopPropagation()"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>' +
+    // Right column: space-between spreads drag handle (top) and trash (bottom)
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 4px 6px 0;flex-shrink:0;min-height:64px;">' +
+      '<svg class="dh" title="Drag to reorder" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>' +
       '<svg class="tb" onclick="event.stopPropagation();TD.deleteScene(' + absIdx + ')" title="Delete" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>' +
     '</div>' +
   '</div>';
@@ -333,6 +356,12 @@ function renderTDOneCol() {
 
   const inner = document.getElementById('td-inner');
   if (!inner) return;
+
+  // Snapshot which sections are currently collapsed before rebuilding
+  const collapsed1col = new Set();
+  document.querySelectorAll('#td-onecol .td1sec-body').forEach((body, i) => {
+    if (body.style.display === 'none') collapsed1col.add(i);
+  });
 
   document.getElementById('td-onecol')?.remove();
   const tdLeft  = document.getElementById('td-left');
@@ -376,14 +405,15 @@ function renderTDOneCol() {
           '<textarea class="gta" rows="2" placeholder="Scene notes. Max 100 words." ' +
             'onchange="TD.editSceneDesc(' + absIdx + ',this.value)">' + descVal + '</textarea>' +
           '<div style="display:flex;align-items:center;gap:6px;margin-top:3px;">' +
-            '<span class="pp-toggle" style="font-family:\'DM Mono\',monospace;font-size:8px;color:' + ppColor + ';" ' +
+            '<span class="pp-toggle" style="font-family:\'DM Mono\',monospace;font-size:10px;color:' + ppColor + ';" ' +
               'onclick="event.stopPropagation();TD.togglePPMode()" title="Click to toggle pp / time">' + display + '</span>' +
+            '<div class="sc-done-wrap' + (isDone ? ' done' : '') + '" onclick="event.stopPropagation();TD.toggleDone(' + absIdx + ')" title="Mark scene complete">' +
+              '<div class="sc-done-box"></div>' +
+              '<span class="sc-done-label">' + (isDone ? 'complete' : '') + '</span>' +
+            '</div>' +
           '</div>' +
         '</div>' +
         '<div class="sc-acts">' +
-          // D: manual checkbox in 1-col
-          '<div class="sc-done' + (isDone ? ' done' : '') + '" title="Mark scene complete" ' +
-            'onclick="event.stopPropagation();TD.toggleDone(' + absIdx + ')"></div>' +
           '<button class="tyd" onclick="event.stopPropagation();App.openRM(App.state.activeStory?.scenes?.[' + absIdx + '])" title="Open SceneDictation">' +
             '<svg width="9" height="11" viewBox="0 0 14 19" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/></svg>' +
             ' Talk Your Draft' +
@@ -430,24 +460,47 @@ function renderTDOneCol() {
   const overlay = document.createElement('div');
   overlay.id = 'td-onecol';
   overlay.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
+  // 1-col header matches 2-col: story nav + structure chooser + pages input
   overlay.innerHTML =
-    '<div style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.06);background:var(--card);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">' +
-      '<div>' +
-        '<div style="font-size:9px;color:var(--ghost);font-family:\'DM Mono\',monospace;letter-spacing:0.06em;margin-bottom:1px;">ScriptOutliner</div>' +
-        '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ghost);">' + story.name + ' \u203a ' + story.sectionPreset + '</div>' +
+    '<div style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);background:var(--card);flex-shrink:0;">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+        '<div style="font-size:9px;color:var(--ghost);font-family:\'DM Mono\',monospace;letter-spacing:0.06em;flex-shrink:0;">ScriptOutliner</div>' +
+        '<div style="display:flex;align-items:center;gap:5px;cursor:pointer;flex:1;min-width:0;" onclick="TD._toggleStoryNav()">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>' +
+          '<span style="font-family:\'Syne\',sans-serif;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">' + story.name + '</span>' +
+          '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>' +
+        '</div>' +
+        '<div style="display:flex;gap:5px;flex-shrink:0;">' +
+          '<button class="ib" style="font-size:9px;" id="td1-collapse-btn" onclick="TD._collapseAll1col()">' +
+            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg> Hide All' +
+          '</button>' +
+          '<button class="ib" style="font-size:9px;" onclick="App.openExportModal(\'td\')">' +
+            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export' +
+          '</button>' +
+        '</div>' +
       '</div>' +
-      '<div style="display:flex;gap:5px;align-items:center;">' +
-        '<button class="ib" style="font-size:9px;" id="td1-collapse-btn" onclick="TD._collapseAll1col()" title="Collapse all sections">' +
-          '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg> Hide All' +
-        '</button>' +
-        '<button class="ib" style="font-size:10px;" onclick="App.openExportModal(\'td\')">' +
-          '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export' +
-        '</button>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span style="font-size:10px;color:var(--ghost);">Structure</span>' +
+        '<button class="ib" style="font-size:10px;flex:1;justify-content:flex-start;" onclick="App.openStructureModal(App.state.activeStory?.sectionPreset, TD._onStructureChange)">' + story.sectionPreset + '</button>' +
+        '<span style="font-size:10px;color:var(--ghost);">Pages</span>' +
+        '<input type="number" class="fi" style="width:52px;text-align:center;font-size:11px;" min="1" max="999" value="' + Math.round((story.minutes||90)/2) + '" onchange="TD._onPagesChange(this.value)" onfocus="this.select()"/>' +
       '</div>' +
     '</div>' +
     '<div style="flex:1;overflow-y:auto;padding:8px 12px 24px;">' + sectionsHtml + '</div>';
 
   inner.appendChild(overlay);
+
+  // Restore collapsed sections
+  if (collapsed1col.size > 0) {
+    preset.sections.forEach((_, idx) => {
+      if (collapsed1col.has(idx)) {
+        const body = document.querySelector('#td1sec-wrap-' + idx + ' .td1sec-body');
+        const chev = document.querySelector('#td1sec-wrap-' + idx + ' .td1-chev');
+        if (body) body.style.display = 'none';
+        if (chev) chev.style.transform = '';
+      }
+    });
+  }
 }
 
 // ── Open a scene in the recorder ──────────────────────────────────────────────
@@ -529,21 +582,16 @@ async function openScene(scene) {
           '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
           ' Reuse characters from\u2026' +
         '</button>' +
-        '<div id="reuse-panel" style="display:none;position:absolute;top:32px;right:0;width:280px;background:var(--raise);border:1px solid rgba(255,255,255,0.15);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.7);z-index:100;overflow:hidden;">' +
-          '<div style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:9px;color:var(--ghost);font-family:\'DM Mono\',monospace;letter-spacing:0.05em;">SELECT A SCENE TO COPY ITS CHARACTERS</div>' +
-          '<div id="reuse-scene-list" style="max-height:180px;overflow-y:auto;">' +
-            ((story.scenes || []).filter(s => s.id !== scene.id).map(s => {
-              const srcIdx = story.scenes.indexOf(s);
-              const chars  = s.chars || ['ACTION','NAME-1','NAME-2','NAME-3','NAME-4','NAME-5','NAME-6','NAME-7','NAME-8','NAME-9'];
-              const layout = localStorage.getItem('td_kbd_layout') || 'numpad';
-              const rows   = layout === 'numpad' ? [7,8,9,4,5,6,1,2,3] : [1,2,3,4,5,6,7,8,9];
-              const mini   = rows.map(i => '<div style="background:var(--surface);border:1px solid rgba(255,255,255,0.08);border-radius:3px;padding:2px 3px;font-size:7px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (chars[i]||'NAME-'+i).substring(0,8) + '<span style="display:block;font-size:6px;color:var(--yellow);opacity:0.7;">' + i + '</span></div>').join('');
-              return '<div style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.05)\'" onmouseout="this.style.background=\'\'" onclick="TD._reuseCharsFrom(' + srcIdx + ')">' +
-                '<div style="font-size:10px;font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.name + '</div>' +
-                '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:4px;">' + mini + '</div>' +
-                '<div style="background:var(--surface);border:1px solid rgba(255,255,255,0.08);border-radius:3px;padding:2px 4px;font-size:7px;color:var(--ghost);text-align:center;">ACTION</div>' +
-              '</div>';
-            }).join('') || '<div style="padding:12px 10px;font-size:10px;color:var(--ghost);font-style:italic;">No other scenes yet.</div>') +
+        // REUSE PANEL — shell only; content built dynamically on open by _buildReusePanelContent()
+        // Requires #reuse-scene-list (left list) and #reuse-preview (right grid) to exist.
+        '<div id="reuse-panel" style="display:none;position:absolute;top:32px;right:0;width:380px;background:var(--raise);border:1px solid rgba(255,255,255,0.15);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.7);z-index:100;overflow:hidden;">' +
+          '<div style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:9px;color:var(--ghost);font-family:\'DM Mono\',monospace;letter-spacing:0.05em;">SELECT A SCENE TO COPY ITS CHARACTERS</div>' +
+          '<div style="display:flex;">' +
+            '<div id="reuse-scene-list" style="width:155px;flex-shrink:0;max-height:200px;overflow-y:auto;border-right:1px solid rgba(255,255,255,0.07);"></div>' +
+            '<div style="flex:1;display:flex;flex-direction:column;padding:8px;">' +
+              '<div id="reuse-preview" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;"></div>' +
+              '<button class="ib" style="width:100%;font-size:10px;justify-content:center;" onclick="TD._reuseLoadSelected()">Load Characters</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -595,66 +643,56 @@ async function openScene(scene) {
   await loadSceneAudio(story, scene);
 }
 
-// ── E: Keyboard SVG builder ────────────────────────────────────────────────────
+// ── E: Keyboard SVG builder — 2-column layout matching the modal SVG (#8) ────────
+// LEFT column = QWERTY body (number row 1–9 across top + QWERTY label below)
+// RIGHT column = Numpad (7-8-9 / 4-5-6 / 1-2-3 / wide-0 + dot), full height
+// In Number Row mode: QWERTY body only, with 1–0 highlighted across the top row
 
 function _buildKbdSVG(layout) {
-  // Keyboard diagram showing key positions
-  // Main body: QWERTY label + number row (1-0) across the top
-  // Numpad on the right, full height
-  // All keys same size: 18x18px with 2px gap
-  const K = 18; // key size
-  const G = 2;  // gap
-  const S = K + G; // step
-
-  // Number row: 0 is on the RIGHT side of 1-9 (standard keyboard 1-0)
-  const numRowKeys = layout === 'numpad' ? [] : ['1','2','3','4','5','6','7','8','9','0'];
-  const numpadKeys = layout === 'numpad' ? [['7','8','9'],['4','5','6'],['1','2','3'],['','0','']] : [];
-
   if (layout === 'numpad') {
-    // Show: main keyboard body with QWERTY + numpad on the right
-    const bodyW = 8 * S + K; // ~8 keys wide for QWERTY suggestion
-    const padX  = bodyW + 8;
-    const rows  = [['7','8','9'],['4','5','6'],['1','2','3'],['','0','']];
-    const totalH = 4 * S + K;
-    const totalW = padX + 3 * S + K;
-
-    let svg = '<svg width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '" xmlns="http://www.w3.org/2000/svg">';
-    // Main keyboard body
-    svg += '<rect x="0" y="0" width="' + bodyW + '" height="' + totalH + '" rx="3" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>';
-    // QWERTY label centered in body
-    svg += '<text x="' + (bodyW/2) + '" y="' + (totalH/2 + 4) + '" text-anchor="middle" font-family="\'DM Mono\',monospace" font-size="11" fill="rgba(255,255,255,0.25)">QWERTY</text>';
-    // Numpad keys
-    rows.forEach((row, ri) => {
-      row.forEach((label, ci) => {
-        if (!label) return;
-        const x = padX + ci * S;
-        const y = ri * S;
-        const isActive = label !== '';
-        svg += '<rect x="' + x + '" y="' + y + '" width="' + K + '" height="' + K + '" rx="2" fill="' + (isActive ? 'rgba(255,216,0,0.12)' : 'rgba(255,255,255,0.03)') + '" stroke="rgba(255,216,0,' + (isActive ? '0.4' : '0.1') + ')" stroke-width="1"/>';
-        svg += '<text x="' + (x + K/2) + '" y="' + (y + K/2 + 4) + '" text-anchor="middle" font-family="\'DM Mono\',monospace" font-size="9" fill="var(--yellow)">' + label + '</text>';
-      });
-    });
-    svg += '</svg>';
-    return svg;
+    // One keyboard: QWERTY section left + Numpad section right, single background.
+    // Number row (top): 1,2,3,4,5,6,7,8,9,0 — all same size and color across full width.
+    // Key 0 sits above the numpad section (standard keyboard layout).
+    // Numpad keys: gap at top only, bottom-aligned. No gap on right.
+    //
+    // viewBox: 210 x 72
+    // Divider at x=140. Number row step=14 (key=12+gap=2), 10 keys: x4..130+12=142 (last 0 at x130)
+    // Numpad x range: 143..207 (3 cols of 13px + 2px gap = 15px step, plus right margin 4px)
+    // Numpad rows at y21,34,47,60 (gap at top: y1..y20)
+    const K = (x,y,w,label,dim) => {
+      const fill   = dim ? 'rgba(255,255,255,0.2)' : '#FFD800';
+      const stroke = dim ? 'rgba(255,255,255,0.2)' : 'rgba(255,216,0,0.45)';
+      return `<rect x="${x}" y="${y}" width="${w}" height="10" rx="2" fill="#38385A" stroke="${stroke}" stroke-width="1"/><text x="${x+w/2}" y="${y+8}" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="${fill}">${label}</text>`;
+    };
+    // Numpad 3-col positions: key width=14, step=20 (col gap=6), fills x143..203
+    const np = (col,row,label) => K(143 + col*20, 21 + row*13, 14, label);
+    return '<svg viewBox="0 0 210 72" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:220px;display:block;">' +
+      '<rect x="1" y="1" width="208" height="70" rx="4" fill="#1C1640" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>' +
+      '<line x1="140" y1="4" x2="140" y2="68" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>' +
+      // Number row 1-0: 10 keys, step=14, first at x4, last (0) at x4+9*14=130
+      K(4,4,12,'1') + K(18,4,12,'2') + K(32,4,12,'3') + K(46,4,12,'4') + K(60,4,12,'5') +
+      K(74,4,12,'6') + K(88,4,12,'7') + K(102,4,12,'8') + K(116,4,12,'9') + K(130,4,12,'0') +
+      '<text x="68" y="44" text-anchor="middle" font-family="DM Mono,monospace" font-size="8" fill="rgba(255,255,255,0.1)">QWERTY</text>' +
+      // Numpad 7-8-9 / 4-5-6 / 1-2-3 (gap above, bottom-aligned)
+      np(0,0,'7') + np(1,0,'8') + np(2,0,'9') +
+      np(0,1,'4') + np(1,1,'5') + np(2,1,'6') +
+      np(0,2,'1') + np(1,2,'2') + np(2,2,'3') +
+      // Wide 0 (2 cols wide = 34) + dot (1 col = 14)
+      K(143,60,34,'0') + K(179,60,14,'.',true) +
+    '</svg>';
   } else {
-    // Number row mode: show full keyboard outline with number row 1-0 highlighted at top
-    const numW = 10 * S + K; // 10 keys wide (1-0)
-    const bodyH = 3 * S + K; // 3 more rows below number row
-    const totalH = S + bodyH; // number row + body
-    const totalW = numW;
-
-    let svg = '<svg width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '" xmlns="http://www.w3.org/2000/svg">';
-    // Number row keys (highlighted)
-    numRowKeys.forEach((label, i) => {
-      const x = i * S;
-      svg += '<rect x="' + x + '" y="0" width="' + K + '" height="' + K + '" rx="2" fill="rgba(255,216,0,0.12)" stroke="rgba(255,216,0,0.4)" stroke-width="1"/>';
-      svg += '<text x="' + (x + K/2) + '" y="' + (K/2 + 4) + '" text-anchor="middle" font-family="\'DM Mono\',monospace" font-size="9" fill="var(--yellow)">' + label + '</text>';
-    });
-    // Keyboard body below
-    svg += '<rect x="0" y="' + S + '" width="' + numW + '" height="' + bodyH + '" rx="3" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>';
-    svg += '<text x="' + (numW/2) + '" y="' + (S + bodyH/2 + 4) + '" text-anchor="middle" font-family="\'DM Mono\',monospace" font-size="11" fill="rgba(255,255,255,0.25)">QWERTY</text>';
-    svg += '</svg>';
-    return svg;
+    // Number Row mode: QWERTY body only, row 1–0 highlighted at top
+    const numW = 220, bodyH = 72;
+    return '<svg viewBox="0 0 ' + numW + ' ' + bodyH + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:220px;display:block;">' +
+      '<rect x="1" y="1" width="' + (numW-2) + '" height="' + (bodyH-2) + '" rx="4" fill="#1C1640" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>' +
+      // Number row 1–0 highlighted
+      ['1','2','3','4','5','6','7','8','9','0'].map((k, i) => {
+        const x = 4 + i * 21;
+        return '<rect x="' + x + '" y="4" width="18" height="12" rx="2" fill="#38385A" stroke="rgba(255,216,0,0.4)" stroke-width="1"/>' +
+               '<text x="' + (x+9) + '" y="13" text-anchor="middle" font-family="DM Mono,monospace" font-size="6" fill="#FFD800">' + k + '</text>';
+      }).join('') +
+      '<text x="110" y="46" text-anchor="middle" font-family="DM Mono,monospace" font-size="8" fill="rgba(255,255,255,0.12)">QWERTY</text>' +
+    '</svg>';
   }
 }
 
@@ -1166,12 +1204,21 @@ window.TD = {
     if (rm_npd && typeof App.rmSetKbd === 'function') App.rmSetKbd(layout);
   },
 
+  // REUSE CHARACTERS PANEL — 2-col version, matches modal design
+  // Left: scrollable scene list with hover highlight
+  // Right: 3x3 key preview + Load Characters button
+  // State: tracks which scene is selected via _reuseSelectedIdx
+
+  _reuseSelectedIdx: null,
+
   _toggleReusePanel() {
     const panel = document.getElementById('reuse-panel');
     if (!panel) return;
     const isOpen = panel.style.display !== 'none';
-    panel.style.display = isOpen ? 'none' : 'block';
     if (!isOpen) {
+      // Build panel content fresh on open
+      this._buildReusePanelContent();
+      panel.style.display = 'block';
       setTimeout(() => {
         document.addEventListener('click', function closePanel(e) {
           const wrap = document.getElementById('reuse-wrap');
@@ -1181,14 +1228,106 @@ window.TD = {
           }
         });
       }, 0);
+    } else {
+      panel.style.display = 'none';
     }
   },
 
-  _reuseCharsFrom(srcIdx) {
+  _buildReusePanelContent() {
     const story = App.state.activeStory;
     const scene = App.state.activeScene;
-    if (isNaN(srcIdx) || !story || !scene) return;
-    const src = story.scenes[srcIdx];
+    const list  = document.getElementById('reuse-scene-list');
+    const prev  = document.getElementById('reuse-preview');
+    if (!list || !prev || !story) return;
+
+    const others = (story.scenes || []).filter(s => s.id !== scene?.id);
+
+    if (!others.length) {
+      list.innerHTML = '<div style="padding:12px 10px;font-size:10px;color:var(--ghost);font-style:italic;">No other scenes yet.</div>';
+      prev.innerHTML = '';
+      this._reuseSelectedIdx = null;
+      return;
+    }
+
+    // Default select first scene
+    const firstIdx = story.scenes.indexOf(others[0]);
+    this._reuseSelectedIdx = firstIdx;
+
+    // Build scene list
+    list.innerHTML = others.map((s, si) => {
+      const srcIdx  = story.scenes.indexOf(s);
+      const isFirst = si === 0;
+      return '<div style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;' +
+        'background:' + (isFirst ? 'rgba(255,255,255,0.07)' : '') + ';' +
+        'color:' + (isFirst ? 'var(--white)' : 'var(--ghost)') + ';' +
+        'font-size:11px;font-weight:' + (isFirst ? '600' : '400') + ';' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .1s;" ' +
+        'data-srcidx="' + srcIdx + '" ' +
+        'onmouseover="TD._reuseHover(' + srcIdx + ',this)" ' +
+        'onmouseout="TD._reuseMouseout(this)" ' +
+        'onclick="TD._reuseSelect(' + srcIdx + ',this)">' +
+        s.name +
+      '</div>';
+    }).join('');
+
+    // Build preview for first scene
+    this._reuseRenderPreview(others[0]);
+  },
+
+  _reuseRenderPreview(src) {
+    const prev = document.getElementById('reuse-preview');
+    if (!prev) return;
+    const layout = localStorage.getItem('td_kbd_layout') || 'numpad';
+    const rows   = layout === 'numpad' ? [7,8,9,4,5,6,1,2,3] : [1,2,3,4,5,6,7,8,9];
+    const chars  = src?.chars || [];
+    prev.innerHTML = rows.map(i =>
+      '<div style="background:var(--surface);border:1px solid rgba(255,255,255,0.08);border-radius:3px;padding:3px 4px;text-align:center;">' +
+        '<div style="font-size:8px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (chars[i]||'NAME-'+i).substring(0,9) + '</div>' +
+        '<div style="font-size:6px;color:var(--yellow);opacity:0.7;">' + i + '</div>' +
+      '</div>'
+    ).join('');
+  },
+
+  _reuseHover(srcIdx, el) {
+    const story = App.state.activeStory;
+    if (!story) return;
+    el.style.background = 'rgba(255,255,255,0.06)';
+    el.style.color = 'var(--white)';
+    this._reuseRenderPreview(story.scenes[srcIdx]);
+  },
+
+  _reuseMouseout(el) {
+    const isSelected = el.dataset.srcidx == this._reuseSelectedIdx;
+    el.style.background = isSelected ? 'rgba(255,255,255,0.07)' : '';
+    el.style.color       = isSelected ? 'var(--white)' : 'var(--ghost)';
+    // Restore preview to selected scene
+    const story = App.state.activeStory;
+    if (story && this._reuseSelectedIdx !== null) {
+      this._reuseRenderPreview(story.scenes[this._reuseSelectedIdx]);
+    }
+  },
+
+  _reuseSelect(srcIdx, el) {
+    this._reuseSelectedIdx = srcIdx;
+    // Clear all selections
+    document.querySelectorAll('#reuse-scene-list [data-srcidx]').forEach(d => {
+      d.style.background = '';
+      d.style.color = 'var(--ghost)';
+      d.style.fontWeight = '400';
+    });
+    el.style.background = 'rgba(255,255,255,0.07)';
+    el.style.color = 'var(--white)';
+    el.style.fontWeight = '600';
+  },
+
+  _reuseLoadSelected() {
+    const story = App.state.activeStory;
+    const scene = App.state.activeScene;
+    if (this._reuseSelectedIdx === null || !story || !scene) {
+      App.showAlert('Select a scene first');
+      return;
+    }
+    const src = story.scenes[this._reuseSelectedIdx];
     if (!src?.chars) return;
     if (!scene.chars) scene.chars = ['ACTION','NAME-1','NAME-2','NAME-3','NAME-4','NAME-5','NAME-6','NAME-7','NAME-8','NAME-9'];
     for (let i = 1; i <= 9; i++) {
@@ -1203,18 +1342,43 @@ window.TD = {
     App.showAlert('Characters copied from ' + src.name, 2000, false, 'notice');
   },
 
+  // Legacy: kept for any old onclick references
+  _reuseCharsFrom(srcIdx) {
+    this._reuseSelectedIdx = srcIdx;
+    this._reuseLoadSelected();
+  },
+
   addSceneToSection(sectionIdx) {
     const story = App.state.activeStory;
     if (!story || !App.checkStuff()) return;
     api.addScene(story, sectionIdx, null, []);
     api.saveStory(story);
+    // Find the newly added scene (last one with this sectionIdx)
+    const newScene = [...(story.scenes || [])].reverse().find(s => s.sectionIdx === sectionIdx);
+    if (newScene) App.state.activeScene = newScene;
     const layout = App.state.layout || '2col';
     if (layout === '2col') {
+      // Only re-render 2-col scene list — do NOT call renderTDOneCol which would swap the view
       renderSceneList(story);
-      const newScene = [...(story.scenes || [])].reverse().find(s => s.sectionIdx === sectionIdx);
-      if (newScene) setTimeout(() => openScene(newScene), 30);
+      if (newScene) setTimeout(() => {
+        openScene(newScene);
+        const card = document.getElementById('tdc-' + newScene.id);
+        if (card) card.scrollIntoView({ block: 'nearest' });
+      }, 30);
     } else {
+      // 1-col: re-render the overlay in place, then scroll to new card without jumping to top
       renderTDOneCol();
+      if (newScene) {
+        setTimeout(() => {
+          const card1 = document.getElementById('tdc1-' + newScene.id);
+          if (card1) {
+            card1.classList.add('sc-a');
+            card1.style.border = '2px solid var(--yellow)';
+            card1.style.boxShadow = '0 0 8px rgba(255,216,0,0.25)';
+            card1.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }, 30);
+      }
     }
   },
 
@@ -1234,12 +1398,26 @@ window.TD = {
     });
   },
 
+  // editSceneNameById: looks up current absIdx by scene ID (avoids stale absIdx from old render)
+  editSceneNameById(sceneId, value) {
+    const story = App.state.activeStory;
+    if (!story) return;
+    const absIdx = story.scenes.findIndex(s => s.id === sceneId);
+    if (absIdx < 0) return;
+    this.editSceneName(absIdx, value);
+  },
+
   editSceneName(absIdx, value) {
     const story = App.state.activeStory;
     if (!story) return;
     value = value.toString().trim();
     if (!value) { App.showAlert('Please enter a scene name'); return; }
-    if (!value.match(/^(INT|EXT|I\/E)(\.| |-)/i)) value = 'EXT. ' + value;
+    // Auto-prefix INT. or EXT. if missing (matching webapp behavior, #11/#16)
+    if (!value.match(/^(INT|EXT|I\/E)(\.| |-)/i)) value = 'INT. ' + value;
+    // Auto-append ' - DAY' if no time-of-day suffix present (#11/#16)
+    if (!value.match(/ - (DAY|NIGHT|DAWN|DUSK|CONTINUOUS|LATER|MOMENTS LATER)/i)) {
+      value = value + ' - DAY';
+    }
     story.scenes[absIdx].name = value.replace(/\n/g,' ').trim().toUpperCase();
     story.scenes[absIdx].lastModified = Date.now();
     api.saveStory(story);
@@ -1248,6 +1426,11 @@ window.TD = {
       const slugEl = document.getElementById('td-rec-slug');
       if (slugEl) slugEl.textContent = story.scenes[absIdx].name;
     }
+    // Update the input's displayed value to show the full processed name
+    const cardInput = document.querySelector('#tdc-' + story.scenes[absIdx].id + ' input.gi');
+    if (cardInput) cardInput.value = story.scenes[absIdx].name;
+    const card1Input = document.querySelector('#tdc1-' + story.scenes[absIdx].id + ' input.gi');
+    if (card1Input) card1Input.value = story.scenes[absIdx].name;
   },
 
   editSceneDesc(absIdx, value) {
@@ -1257,9 +1440,23 @@ window.TD = {
     story.scenes[absIdx].desc = value;
     story.scenes[absIdx].lastModified = Date.now();
     api.saveStory(story);
+    // Update recorder panel desc display if this is the active scene
     if (story.scenes[absIdx]?.id === App.state.activeScene?.id) {
       const descEl = document.querySelector('#td-recorder > div > div:first-child');
       if (descEl) descEl.innerHTML = value || '<span style="color:var(--ghost);font-style:italic;font-size:10px;">Scene notes. Max 100 words.</span>';
+    }
+    // Update textarea in 1-col card without full re-render (#7)
+    const sc = story.scenes[absIdx];
+    const card1 = document.getElementById('tdc1-' + sc.id);
+    if (card1) {
+      const ta = card1.querySelector('textarea.gta');
+      if (ta) ta.value = value;
+    }
+    // Update textarea in 2-col card
+    const card2 = document.getElementById('tdc-' + sc.id);
+    if (card2) {
+      const ta = card2.querySelector('textarea.gta');
+      if (ta) ta.value = value;
     }
   },
 
@@ -1288,11 +1485,13 @@ window.TD = {
     scene.done = !scene.done;
     scene.lastModified = Date.now();
     api.saveStory(story);
-    // Update checkbox in DOM without full re-render
-    const cb2 = document.querySelector('#tdc-' + scene.id + ' .sc-done');
-    const cb1 = document.querySelector('#tdc1-' + scene.id + ' .sc-done');
-    [cb2, cb1].forEach(el => {
-      if (el) el.classList.toggle('done', scene.done);
+    // Update .sc-done-wrap elements in DOM without full re-render
+    [document.querySelector('#tdc-' + scene.id + ' .sc-done-wrap'),
+     document.querySelector('#tdc1-' + scene.id + ' .sc-done-wrap')].forEach(el => {
+      if (!el) return;
+      el.classList.toggle('done', scene.done);
+      const lbl = el.querySelector('.sc-done-label');
+      if (lbl) lbl.textContent = scene.done ? 'complete' : '';
     });
   },
 
@@ -1346,11 +1545,14 @@ window.TD = {
         if (App.state.activeScene?.id === scene.id) App.state.activeScene = null;
         story.scenes.splice(absIdx, 1);
         api.saveStory(story);
-        renderSceneList(story);
+        // Re-render only the current layout to avoid swapping views
+        const layout = App.state.layout || '2col';
+        if (layout === '2col') renderSceneList(story);
+        else renderTDOneCol();
       });
   },
 
-  // F: character rename with allChars dropdown sorted by frequency
+  // F: character rename — matches webapp modal: "Enter or select a character name" (#13)
   charPress(n) {
     if (App.state.mode === 'active') { startStopRecording(n, false); return; }
     const story = App.state.activeStory;
@@ -1361,8 +1563,8 @@ window.TD = {
 
     const chars = _allCharsSorted(story);
 
-    // Build a custom modal-like prompt with a dropdown
-    App.showPromptModal('Rename Character', 'Enter name for button ' + n + ':', current, (newName) => {
+    // Modal title + message match the webapp charEdit modal (#13)
+    App.showPromptModal('Enter or select a character name', 'Button ' + n + ':', current, (newName) => {
       if (!newName?.trim()) return;
       if (!scene.chars) scene.chars = ['ACTION','NAME-1','NAME-2','NAME-3','NAME-4','NAME-5','NAME-6','NAME-7','NAME-8','NAME-9'];
       scene.chars[n] = newName.trim().toUpperCase();
@@ -1372,17 +1574,18 @@ window.TD = {
       if (lbl) lbl.textContent = scene.chars[n];
     });
 
-    // Inject a select below the input in the confirm modal
+    // Inject a select below the input — existing chars dropdown (#3: clear first)
     setTimeout(() => {
       const inp = document.getElementById('cm-input');
-      if (!inp || !chars.length) return;
-      const existing = document.getElementById('cm-char-select');
-      if (existing) return; // already injected
+      if (!inp) return;
+      // Remove any leftover select from a previous modal (#3)
+      document.getElementById('cm-char-select')?.remove();
+      if (!chars.length) return;
       const sel = document.createElement('select');
       sel.id = 'cm-char-select';
       sel.className = 'fi';
       sel.style.cssText = 'width:100%;margin-top:6px;font-size:11px;';
-      sel.innerHTML = '<option value="">— pick existing character —</option>' +
+      sel.innerHTML = '<option value="">Characters…</option>' +
         chars.map(c => '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>').join('');
       sel.onchange = () => { if (sel.value) inp.value = sel.value; };
       inp.parentNode.insertBefore(sel, inp.nextSibling);
@@ -1512,8 +1715,22 @@ window.TD = {
     if (!pages || pages < 1) return;
     story.minutes = pages * 2;
     App.api.saveStory(story);
-    const btn = document.getElementById('td-struct-btn');
-    if (btn) btn.textContent = story.sectionPreset;
+    // Re-render only the current layout — never call the other layout's render
+    // or it will visually swap the view. (#5)
+    // NOTE (Tauri migration): Alpine reactivity handles this automatically.
+    const layout = App.state.layout || '2col';
+    if (layout === '2col') renderSceneList(story);
+    else renderTDOneCol();
+  },
+
+  // Refresh only the outline (scene list or 1-col overlay) without rebuilding the full shell.
+  // Called by rmAddScene to update background after adding a scene from the modal.
+  refreshOutline() {
+    const story = App.state.activeStory;
+    if (!story) return;
+    const layout = App.state.layout || '2col';
+    if (layout === '2col') renderSceneList(story);
+    else renderTDOneCol();
   },
 
   async exportTranscript() {

@@ -351,6 +351,8 @@ function _renderModal() {
   const m = state.modal;
   document.getElementById('cm-title').textContent = m.title;
   document.getElementById('cm-msg').textContent   = m.message;
+  // #3: Remove any stale character-select dropdown injected by a previous charPress() call
+  document.getElementById('cm-char-select')?.remove();
   const inp = document.getElementById('cm-input');
   if (m.type === 'prompt') {
     inp.style.display = '';
@@ -526,9 +528,15 @@ function _buildRMNumpad(scene) {
     <div class="acb" id="rm-cb-0" onclick="App.rmCharPress(0)">
       <span class="cn-badge-c">0</span> ACTION
     </div>
-    <div style="display:flex;align-items:center;justify-content:center;">
-      <div class="mb" id="rm-mic" onclick="App.rmToggleRecord()">
-        <svg width="14" height="19" viewBox="0 0 14 19" fill="var(--yellow)"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/></svg>
+    <!-- #12: 3-level pill record button matching 2-col design -->
+    <div id="rm-mic" onclick="App.rmToggleRecord()" class="record-button-wrapper resting" style="cursor:pointer;">
+      <div class="record-button-container">
+        <div class="record-button-content" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">
+          <div class="mic-icon-wrapper">
+            <svg class="mic-icon" viewBox="0 0 14 19" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/></svg>
+          </div>
+          <span class="button-text" style="margin-top:1px;">TRANSCRIBE</span>
+        </div>
       </div>
     </div>`;
 }
@@ -701,14 +709,25 @@ function rmAddScene() {
   const scene = state.activeScene;
   if (!story || !scene) return;
   const sIdx = scene.sectionIdx || 0;
-  api.addScene(story, sIdx, null, scene.chars ? [].concat(scene.chars) : []);
+  // Insert immediately after the current scene (#11), not at end of section
+  const currentAbsIdx = story.scenes.findIndex(s => s.id === scene.id);
+  const insertAt = currentAbsIdx >= 0 ? currentAbsIdx + 1 : story.scenes.length;
+  const newScene = api.addScene(story, sIdx, insertAt, scene.chars ? [].concat(scene.chars) : []);
   api.saveStory(story);
-  if (typeof TD !== 'undefined') {
-    const layout = state.layout || '2col';
-    if (layout === '2col') { const ev = new CustomEvent('ts:storyopen', {detail:{story}}); document.dispatchEvent(ev); }
-    else document.dispatchEvent(new CustomEvent('ts:storyopen', {detail:{story}}));
+  // Refresh the outline without rebuilding the full shell or swapping views
+  if (typeof TD !== 'undefined' && typeof TD.refreshOutline === 'function') {
+    TD.refreshOutline();
+  } else {
+    document.dispatchEvent(new CustomEvent('ts:storyopen', {detail:{story}}));
   }
   document.getElementById('rm-sa-menu').style.display = 'none';
+  document.getElementById('rm-sa-plus').style.display = '';
+  document.getElementById('rm-sa-minus').style.display = 'none';
+  // Load the new scene into the modal
+  if (newScene) {
+    state.activeScene = newScene;
+    openRM(newScene);
+  }
   showAlert('Scene added.', 1500, false, 'notice');
 }
 
@@ -766,13 +785,26 @@ function rmToggleTranscript() {
 }
 
 function rmCharPress(n) {
-  // Rename character (setup mode) or switch speaker (active mode)
+  // Rename character — matches webapp modal wording (#13)
   const scene = state.activeScene;
   const story = state.activeStory;
   if (!scene || !story) return;
   if (n === 0) return;
   const current = scene.chars?.[n] || 'NAME-' + n;
-  showPromptModal('Rename Character', `Enter name for button ${n}:`, current, (newName) => {
+  // Import allChars list for the dropdown
+  const freq = {};
+  for (const sc of (story.scenes || [])) {
+    for (let i = 1; i <= 9; i++) {
+      const nm = sc.chars?.[i];
+      if (nm && !nm.match(/^NAME-\d$/)) freq[nm] = (freq[nm] || 0) + 1;
+    }
+    for (const tid of (sc.trackOrder || [])) {
+      const t = sc.tracks?.[tid];
+      if (t?.name && t.name !== 'ACTION' && !t.name.match(/^NAME-\d$/)) freq[t.name] = (freq[t.name] || 0) + 1;
+    }
+  }
+  const chars = Object.keys(freq).sort((a,b) => freq[b] - freq[a]);
+  showPromptModal('Enter or select a character name', 'Button ' + n + ':', current, (newName) => {
     if (!newName?.trim()) return;
     if (!scene.chars) scene.chars = ['ACTION','NAME-1','NAME-2','NAME-3','NAME-4','NAME-5','NAME-6','NAME-7','NAME-8','NAME-9'];
     scene.chars[n] = newName.trim().toUpperCase();
@@ -781,6 +813,21 @@ function rmCharPress(n) {
     const lbl = document.getElementById('rm-cbn-' + n);
     if (lbl) lbl.textContent = scene.chars[n];
   });
+  // Inject characters dropdown (#13)
+  setTimeout(() => {
+    const inp = document.getElementById('cm-input');
+    if (!inp) return;
+    document.getElementById('cm-char-select')?.remove();
+    if (!chars.length) return;
+    const sel = document.createElement('select');
+    sel.id = 'cm-char-select';
+    sel.className = 'fi';
+    sel.style.cssText = 'width:100%;margin-top:6px;font-size:11px;';
+    sel.innerHTML = '<option value="">Characters…</option>' +
+      chars.map(c => '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>').join('');
+    sel.onchange = () => { if (sel.value) inp.value = sel.value; };
+    inp.parentNode.insertBefore(sel, inp.nextSibling);
+  }, 30);
 }
 
 function rmToggleRecord() {
@@ -797,11 +844,22 @@ function _rmUpdateWave() {
   const audio = document.getElementById('rm-audio');
   const mic   = document.getElementById('rm-mic');
   if (!setup) return;
+  // #12: swap pill button between resting and recording state
   if (s.mode === 'active') {
     setup.style.display = 'none'; if(trans) trans.style.display='none'; if(audio) audio.style.display='none';
     if(act) act.style.display='flex';
-    if(mic) mic.innerHTML = `<svg width="18" height="18" viewBox="0 0 512 512" fill="var(--green)"><path d="M224 432h-80V80h80zM368 432h-80V80h80z"/></svg>`;
-    if(mic) mic.classList.add('rec-on');
+    if(mic) {
+      mic.className = 'record-button-wrapper recording';
+      mic.innerHTML =
+        '<div class="record-button-container">' +
+          '<div class="record-button-content" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">' +
+            '<div class="mic-icon-wrapper-active">' +
+              '<svg class="mic-icon-active" viewBox="0 0 512 512"><path d="M224 432h-80V80h80zM368 432h-80V80h80z"/></svg>' +
+            '</div>' +
+            '<span class="button-text-active" style="margin-top:1px;">STOP</span>' +
+          '</div>' +
+        '</div>';
+    }
   } else if (s.mode === 'transcription') {
     setup.style.display='none'; if(act) act.style.display='none'; if(audio) audio.style.display='none';
     if(trans) trans.style.display='flex';
@@ -813,7 +871,18 @@ function _rmUpdateWave() {
     } else {
       setup.style.display='flex'; if(audio) audio.style.display='none';
     }
-    if(mic) { mic.innerHTML=`<svg width="14" height="19" viewBox="0 0 14 19" fill="var(--yellow)"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/></svg>`; mic.classList.remove('rec-on'); }
+    if(mic) {
+      mic.className = 'record-button-wrapper resting';
+      mic.innerHTML =
+        '<div class="record-button-container">' +
+          '<div class="record-button-content" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">' +
+            '<div class="mic-icon-wrapper">' +
+              '<svg class="mic-icon" viewBox="0 0 14 19" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/></svg>' +
+            '</div>' +
+            '<span class="button-text" style="margin-top:1px;">TRANSCRIBE</span>' +
+          '</div>' +
+        '</div>';
+    }
   }
 }
 
@@ -827,7 +896,23 @@ function checkStuff() {
 
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 function onKeyDown(e) {
-  if (e.metaKey || e.ctrlKey) return;
+  // Clipboard shortcuts: Neutralino's WKWebView on macOS may block Cmd+C/V/X/A/Z
+  // in dynamically-created inputs. Explicitly relay them via execCommand.
+  // NOTE (Tauri migration): Tauri handles this natively, this block can be removed.
+  if (e.metaKey || e.ctrlKey) {
+    const tag = document.activeElement?.tagName;
+    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' ||
+                       document.activeElement?.isContentEditable;
+    if (isEditable) {
+      const map = { c:'copy', x:'cut', v:'paste', a:'selectAll', z:'undo', Z:'redo' };
+      if (map[e.key]) {
+        e.stopPropagation();
+        // Let the browser handle it natively first; execCommand is a fallback
+        setTimeout(() => { try { document.execCommand(map[e.key]); } catch(_){} }, 0);
+      }
+    }
+    return;
+  }
   if (state.mode === 'active') {
     const k = e.key;
     if ((k >= '0' && k <= '9') || k === ' ' || e.code === 'NumpadDecimal') {
@@ -861,6 +946,51 @@ window.App = {
   rmToggleTranscript, rmToggleIns, rmToggleReuse, rmLoadChars,
   rmCharPress, rmToggleRecord, rmSetKbd,
   _rmHoverScene, _rmSelectScene,
+  // #11: slug + notes save with scene name rules
+  rmSaveSlug(val) {
+    const scene = state.activeScene;
+    const story = state.activeStory;
+    if (!scene || !story) return;
+    let value = (val || '').toString().trim();
+    if (!value) return;
+    // Auto-prefix INT./EXT. if missing
+    if (!value.match(/^(INT|EXT|I\/E)(\.| |-)/i)) value = 'INT. ' + value;
+    // Auto-append '  - DAY' if no time-of-day suffix (two spaces before hyphen)
+    if (!value.match(/ - (DAY|NIGHT|DAWN|DUSK|CONTINUOUS|LATER|MOMENTS LATER)/i)) value = value + ' - DAY';
+    scene.name = value.replace(/\n/g,' ').trim().toUpperCase();
+    scene.lastModified = Date.now();
+    api.saveStory(story);
+    // Update displayed value in slug field
+    const slugEl = document.getElementById('rm-slug');
+    if (slugEl) slugEl.value = scene.name;
+    // Update scene list cards if visible
+    if (typeof TD !== 'undefined') {
+      const absIdx = story.scenes.findIndex(s => s.id === scene.id);
+      if (absIdx >= 0) {
+        const c2 = document.querySelector('#tdc-' + scene.id + ' input.gi');
+        if (c2) c2.value = scene.name;
+        const c1 = document.querySelector('#tdc1-' + scene.id + ' input.gi');
+        if (c1) c1.value = scene.name;
+      }
+    }
+  },
+  rmSaveNotes(val) {
+    const scene = state.activeScene;
+    const story = state.activeStory;
+    if (!scene || !story) return;
+    const absIdx = story.scenes.findIndex(s => s.id === scene.id);
+    if (absIdx < 0) return;
+    // Delegate to TD.editSceneDesc so 1-col card textarea also updates (#7)
+    if (typeof TD !== 'undefined') {
+      TD.editSceneDesc(absIdx, (val || '').toString());
+    } else {
+      const value = (val || '').toString();
+      if (value.split(/\s/).length > 100) showAlert('Scene notes should be less than 100 words.');
+      scene.desc = value;
+      scene.lastModified = Date.now();
+      api.saveStory(story);
+    }
+  },
   state, api, utils, genId, STRUCTURES,
 };
 

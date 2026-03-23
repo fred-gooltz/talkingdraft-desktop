@@ -18,7 +18,8 @@
     "os.*",
     "filesystem.*",
     "debug.*",
-    "window.*"
+    "window.*",
+    "clipboard.*"
   ],
   "globalVariables": {
     "TEST1": "Hello",

@@ -304,12 +304,13 @@ body {
 
 /* ===================== NUMPAD ===================== */
 
-.npd { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+.npd { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; }
 .cb {
-  position: relative; padding: 10px 6px; border-radius: 6px;
+  position: relative; padding: 6px 4px; border-radius: 6px;
   background: var(--surface); border: 1px solid rgba(255,255,255,0.08);
   cursor: pointer; text-align: center; font-family: 'Syne', sans-serif;
   font-size: 11px; font-weight: 700; transition: all .12s; user-select: none;
+  min-height: 52px; display: flex; align-items: center; justify-content: center;
 }
 .cb:hover { background: var(--lift); }
 .cb.cba   { background: rgba(44,216,61,0.1); border-color: var(--green); }
@@ -320,11 +321,11 @@ body {
   border-radius: 2px; padding: 0 2px;
 }
 .acb {
-  position: relative; grid-column: span 2; padding: 9px; border-radius: 6px;
+  position: relative; grid-column: span 2; padding: 6px; border-radius: 6px;
   background: var(--surface); border: 1px solid rgba(255,255,255,0.08);
   cursor: pointer; text-align: center; font-family: 'Syne', sans-serif;
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  transition: all .12s;
+  transition: all .12s; min-height: 52px; display: flex; align-items: center; justify-content: center;
 }
 .acb:hover { background: var(--lift); }
 .acb.cba   { background: rgba(44,216,61,0.1); border-color: var(--green); }
@@ -451,20 +452,19 @@ body {
     rgba(255,209,5,.6) 100%);
   background-size: 200% 200%;
   animation: rotateBorder 4s linear infinite;
-  border-radius: 40px;
-  padding: 2px;
+  border-radius: 26px;
+  padding: 2px; /* 2px gradient border */
 }
 @keyframes rotateBorder {
   0%   { background-position: 0% 50%; }
   100% { background-position: 200% 50%; }
 }
-/* Middle container — oval sizing layer, 208×80, shows border gap */
+/* Middle container — oval sizing layer, fills grid cell, shows border gap */
 .record-button-container {
-  width: 208px;
-  height: 80px;
-  margin: 0 auto;
-  border-radius: 40px;
-  padding: 2px;
+  width: 100%;
+  height: 52px;
+  border-radius: 26px;
+  padding: 0; /* border comes from wrapper padding only */
   background: transparent;
 }
 .record-button-wrapper.recording .record-button-container {
@@ -474,7 +474,7 @@ body {
 .record-button-content {
   width: 100%; height: 100%;
   background: var(--card);
-  border-radius: 38px;
+  border-radius: 24px;
   display: flex; align-items: center; justify-content: center;
   position: relative; z-index: 1;
   transition: background-color 0.3s ease;
@@ -482,14 +482,14 @@ body {
 .record-button-wrapper.resting .record-button-content:hover { background: #E6F4F3; }
 .record-button-wrapper.recording .record-button-content { background: #BAE8E8; }
 .mic-icon-wrapper {
-  width: 48px; height: 48px;
+  width: 32px; height: 32px;
   background: #64748b;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   position: relative;
 }
 .mic-icon {
-  width: 28px; height: 28px;
+  width: 18px; height: 18px;
   fill: #DC2626;
   animation: colorMorph 3s ease-in-out infinite;
 }
@@ -501,7 +501,7 @@ body {
 .record-button-wrapper.resting .record-button-content:hover .mic-icon { fill: #FFD800; animation: none; }
 .record-button-wrapper.resting .record-button-content:hover .mic-icon-wrapper { background: #DC2626; }
 .mic-icon-wrapper-active {
-  width: 48px; height: 48px;
+  width: 32px; height: 32px;
   background: #DADFF2;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -516,14 +516,14 @@ body {
   75%  { box-shadow: -6px 0  12px 2px rgba(44,216,61,.7); }
   100% { box-shadow: 0  -6px 12px 2px rgba(44,216,61,.7); }
 }
-.mic-icon-active { width: 28px; height: 28px; fill: var(--green); }
+.mic-icon-active { width: 18px; height: 18px; fill: var(--green); }
 .button-text {
-  font-size: 11px; font-weight: 200; letter-spacing: 0.3px;
-  color: #fff; text-transform: uppercase; text-align: center;
-  transition: color 0.3s ease;
+  font-size: 8px; font-weight: 400; letter-spacing: 0.2px;
+  color: rgba(255,255,255,0.6); text-transform: uppercase; text-align: center;
+  transition: color 0.3s ease; margin-top: 2px;
 }
-.record-button-wrapper.resting .record-button-content:hover .button-text { color: var(--deep); font-weight: 200; }
-.button-text-active { font-size: 11px; font-weight: 200; letter-spacing: 0.3px; color: var(--deep); text-transform: uppercase; text-align: center; }
+.record-button-wrapper.resting .record-button-content:hover .button-text { color: var(--deep); }
+.button-text-active { font-size: 8px; font-weight: 400; letter-spacing: 0.2px; color: var(--deep); text-transform: uppercase; text-align: center; margin-top: 2px; }
 
 /* ── Key badge Option C: yellow top-right ────────────────────────────────── */
 .cn-badge-c {
@@ -545,19 +545,30 @@ body {
   border-color: rgba(0,0,0,0.2);
 }
 
-/* ── Scene done checkbox ──────────────────────────────────────────── */
-.sc-done {
-  width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,0.2); cursor: pointer;
+/* ── Scene done checkbox — inline with pp display ─────────────────── */
+.sc-done-wrap {
+  display: flex; align-items: center; gap: 4px; cursor: pointer;
+  user-select: none;
+}
+.sc-done-box {
+  width: 13px; height: 13px; border-radius: 2px; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
   display: flex; align-items: center; justify-content: center;
   transition: border-color .12s, background .12s;
   background: transparent;
 }
-.sc-done:hover { border-color: var(--yellow); }
-.sc-done.done  { border-color: var(--yellow); background: rgba(255,216,0,0.12); }
-.sc-done.done::after {
-  content: '✓'; font-size: 10px; color: var(--yellow); font-weight: 700;
+.sc-done-wrap:hover .sc-done-box { border-color: var(--yellow); }
+.sc-done-wrap.done .sc-done-box  { border-color: var(--yellow); background: rgba(255,216,0,0.12); }
+.sc-done-wrap.done .sc-done-box::after {
+  content: '✓'; font-size: 9px; color: var(--yellow); font-weight: 700; line-height: 1;
 }
+.sc-done-label {
+  font-family: 'DM Mono', monospace; font-size: 8px;
+  color: rgba(107,122,153,0.6); transition: color .12s;
+}
+.sc-done-wrap.done .sc-done-label { color: var(--yellow); }
+/* legacy class kept for compat */
+.sc-done { display: none; }
 
 /* ── pp/time toggle on scene cards ─────────────────────────────────── */
 .pp-toggle { cursor: pointer; user-select: none; }

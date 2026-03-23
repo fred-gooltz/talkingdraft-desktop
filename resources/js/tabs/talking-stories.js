@@ -76,10 +76,11 @@ export function renderTalkingStories(container) {
           </button>
         </div>
 
-        <!-- Re-record a line row -->
-        <div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ghost);">Click a line to re-record it</span>
-          <div style="width:28px;height:28px;border-radius:50%;background:rgba(186,232,232,0.05);border:1px solid rgba(186,232,232,0.15);opacity:0.4;display:flex;align-items:center;justify-content:center;">
+        <!-- Re-record a line row — locked, coming soon.
+             pointer-events:none prevents cursor CSS from rendering, so we use onclick blocker instead. -->
+        <div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;cursor:not-allowed;opacity:0.4;user-select:none;" title="Coming soon" onclick="event.preventDefault();event.stopPropagation();">
+          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ghost);">Click a line to re-record it</span>
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(186,232,232,0.05);border:1px solid rgba(186,232,232,0.15);display:flex;align-items:center;justify-content:center;">
             <svg width="12" height="14" viewBox="0 0 14 19" fill="var(--dim)"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 12C8.7 12 10 10.7 10 9V3C10 1.3 8.7 0 7 0C5.3 0 4 1.3 4 3V9C4 10.7 5.3 12 7 12ZM12.3 9C12.3 12 9.8 14.1 7 14.1C4.2 14.1 1.7 12 1.7 9H0C0 12.4 2.7 15.2 6 15.7V19H8V15.7C11.3 15.2 14 12.4 14 9H12.3Z"/></svg>
           </div>
         </div>
@@ -91,14 +92,16 @@ export function renderTalkingStories(container) {
           </div>
         </div>
 
-        <!-- Locked bottom section -->
+        <!-- Bottom section: Publish Podcast link -->
         <div style="padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,0.05);flex-shrink:0;">
-          <button disabled style="width:100%;padding:10px;border-radius:5px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.22);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.05em;cursor:not-allowed;display:flex;align-items:center;justify-content:center;gap:7px;">
+          <!-- Use Neutralino.os.open() to launch system browser — target="_blank" doesn't work in Neutralino WebView.
+               NOTE (Tauri migration): use shell.open() from @tauri-apps/plugin-shell instead. -->
+          <a href="#" onclick="event.preventDefault();if(typeof Neutralino!=='undefined')Neutralino.os.open('https://talkingdraft.com/more-about-talkingstories/');" style="width:100%;padding:10px;border-radius:5px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.22);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.05em;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;cursor:pointer;transition:border-color .12s,color .12s;" onmouseover="this.style.borderColor='rgba(255,216,0,0.3)';this.style.color='rgba(255,255,255,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='rgba(255,255,255,0.22)'">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/></svg>
             Publish Podcast
             <span style="font-family:'DM Mono',monospace;font-size:8px;border:1px solid currentColor;border-radius:2px;padding:0 3px;">LOCKED</span>
-          </button>
-          <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(255,255,255,0.18);text-align:center;margin-top:5px;">Assign voices to all characters and approve to unlock</div>
+          </a>
+          <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(255,255,255,0.18);text-align:center;margin-top:5px;">Learn more about TalkingStories</div>
         </div>
 
       </div>
@@ -106,11 +109,29 @@ export function renderTalkingStories(container) {
   `;
 
   document.addEventListener('ts:storyopen', (e) => _populate(e.detail.story));
-  // Re-render cast rows when tab is entered (active scene may have changed in TalkingDraft)
+  // Re-render entire script + cast when tab is entered so fresh transcript data is shown.
+  // NOTE (Tauri migration): Alpine reactivity may handle this automatically via x-for;
+  // if so, this explicit re-render may be redundant and can be removed.
   document.addEventListener('ts:tabenter', (e) => {
     if (e.detail.tab === 'ts') {
       const story = App.state.activeStory;
-      if (story) _renderCastRows(story);
+      if (story) {
+        _renderScript(story);   // re-read scene.tracks[tid].transcript from current memory
+        _renderCastRows(story);
+        // Update header breadcrumb
+        const bc = document.getElementById('ts-breadcrumb');
+        if (bc) bc.textContent = story.name;
+        // If there's an active scene, scroll to it and update slug
+        const active = App.state.activeScene;
+        if (active) {
+          const slug = document.getElementById('ts-scene-slug');
+          if (slug) slug.textContent = active.name;
+          setTimeout(() => {
+            const el = document.getElementById('tss-' + active.id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 80);
+        }
+      }
     }
   });
 }
@@ -160,8 +181,8 @@ function _renderScript(story) {
 
     return `
       <div id="tss-${scene.id}" style="margin-bottom:28px;">
-        <div style="font-family:'Courier Prime',monospace;font-size:12px;color:var(--ghost);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);">
-          ${scene.name}
+        <div style="font-family:'Courier Prime',monospace;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--white);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          ${scene.name.toUpperCase()}
         </div>
         ${tracks || '<div style="color:var(--ghost);font-size:11px;font-style:italic;">No transcript yet.</div>'}
       </div>`;

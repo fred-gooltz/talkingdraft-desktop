@@ -94,10 +94,17 @@ let _pickedStructure = null;
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
 
+const PROGRESS_TOOLTIPS = {
+  'Beatsheet': 'Sections with beat notes written',
+  'Outline':   'Sections that have at least one scene',
+  'Script':    'Scenes with dictated audio recorded',
+};
+
 function progressRow(label, pct) {
-  return `<div style="display:flex;align-items:center;gap:8px;">
-    <span style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--ghost);width:72px;flex-shrink:0;">${label}</span>
-    <div class="pt"><div class="pf" style="width:${pct}%"></div></div>
+  const tip = PROGRESS_TOOLTIPS[label] || label;
+  return `<div style="display:flex;align-items:center;gap:8px;" title="${tip}">
+    <span style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--ghost);width:60px;flex-shrink:0;cursor:default;" title="${tip}">${label}</span>
+    <div class="pt" title="${tip}"><div class="pf" style="width:${pct}%"></div></div>
     <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ghost);width:24px;text-align:right;">${pct}%</span>
   </div>`;
 }
@@ -150,19 +157,27 @@ function renderCards(list) {
             ${progressRow('Outline',   outlinePct)}
             ${progressRow('Script',    scriptPct)}
           </div>
-          <div style="padding-top:8px;border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ghost);">last modified</span>
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);">${pp} of ${pages} pp dictated</span>
+          <div style="padding-top:8px;border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:flex-end;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);" title="Total dictated audio across all scenes">${pp} of ${pages} pp dictated</span>
           </div>
         </div>
       </div>
     `;
   }).join('');
 
-  // Close menus when clicking outside
-  document.addEventListener('click', () => {
-    document.querySelectorAll('[id^="menu-"]').forEach(m => m.style.display = 'none');
-  }, { once: true });
+  // Close menus when clicking outside.
+  // NOTE: We use setTimeout to defer the listener so the same click that opened
+  // the menu doesn't immediately re-close it. { once:true } consumed the next
+  // click globally and broke subsequent hamburger opens — removed.
+  setTimeout(() => {
+    function _closeAllMenus(e) {
+      const anyMenuOpen = !!document.querySelector('.story-menu.open');
+      if (!anyMenuOpen) { document.removeEventListener('click', _closeAllMenus); return; }
+      document.querySelectorAll('.story-menu.open').forEach(m => m.classList.remove('open'));
+    }
+    document.removeEventListener('click', _closeAllMenus); // prevent stacking on re-render
+    document.addEventListener('click', _closeAllMenus);
+  }, 0);
 }
 
 // ── Dash actions (global) ─────────────────────────────────────────────────────
